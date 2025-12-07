@@ -5,6 +5,9 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
+#include <signal.h>
+
+#define MESSAGE_LEN 512 
 
 typedef enum{
     CMD_INVALID = -1,
@@ -27,7 +30,7 @@ struct Command{
     CommandType type;
     char args[64];
     bool isValid;
-    char errorMsg[64];
+    char errorMsg[128];
 };
 
 //parsam comanda primita de la client si o stocam in structura Command

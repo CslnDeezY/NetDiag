@@ -14,6 +14,7 @@
 #include <string.h>
 
 extern int errno;
+#define message_len 516
 int port;
 
 int recive_Message(int fd, char* buffer);
@@ -23,7 +24,6 @@ int main (int argc, char *argv[])
     int sd;			// socket descriptor
     struct sockaddr_in server;
     char msg[100];		
-    char recv_msg[516];
 
     if(argc != 3){
         printf ("[client] Sintaxa: %s <adresa_server> <port>\n", argv[0]);

@@ -9,7 +9,7 @@ struct Command parse_Command(const char* commandStr){
     cmd.isValid = false;
 
     //analizam inputul 
-    char buffer[516];
+    char buffer[MESSAGE_LEN];  // Now uses compile-time constant
     strncpy(buffer, commandStr, sizeof(buffer)-1);
     buffer[sizeof(buffer)-1] = '\0';
     //analizamcomanda primita de la client si o stocam in structura P_Command
@@ -224,7 +224,8 @@ struct Command parse_Command(const char* commandStr){
             return cmd;
         }
     }
-        
+    cmd.isValid = false;
+    strcpy(cmd.errorMsg, "Unknown command");
     return cmd;
 } //end functie parseCommand
 

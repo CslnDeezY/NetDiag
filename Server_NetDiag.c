@@ -1,24 +1,10 @@
-#include <arpa/inet.h>
-//#include <ctype.h>
-#include <asm-generic/socket.h>
-#include <errno.h>
-#include <strings.h>
-#include <unistd.h>
-#include <netinet/in.h>
-#include <sys/time.h>
-#include <sys/types.h>
-#include <sys/select.h>
-#include <sys/socket.h>
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdbool.h>
-#include <string.h>
-
-#include "command.c"
+#include "command.h"
+#include "traceroute.h"
 
 extern int errno;
+#define message_len 516
 #define PORT 2728
+
 
 
 
@@ -52,6 +38,8 @@ int main(int argc, char* argv[]){
 
     int nfds;			            //nr maxim
     int len;			            //lungimea structurii sockaddr_in
+
+    signal(SIGPIPE, SIG_IGN);
 
     //creez socket
     if((sd = socket(AF_INET, SOCK_STREAM, 0)) == -1){
@@ -109,7 +97,7 @@ int main(int argc, char* argv[]){
             len = sizeof(from);
             bzero(&from, sizeof(from));
 
-            client = accept(sd, (struct sockaddr *) &from, &len);
+            client = accept(sd, (struct sockaddr *) &from, (socklen_t *) &len);
             if(client < 0){
                 perror("[server] Error: accept()\n");
                 return errno;
@@ -130,8 +118,8 @@ int main(int argc, char* argv[]){
         for(int fd = 0; fd <= nfds; fd++){
             //exist socket de citire gata
             if( fd != sd && FD_ISSET(fd, &readfds)){
-                /*==============================================================IMP=====================================*/
-                char buffer[516];
+                /*===============IMP==========================*/
+                char buffer[message_len];
                 bzero(buffer, sizeof(buffer));
 
                 int bytesRead = recv(fd, buffer, sizeof(buffer)-1, 0);
@@ -148,6 +136,7 @@ int main(int argc, char* argv[]){
                     //am primit date
                     buffer[bytesRead] = '\0';
                     printf("[server] Am primit de la clientul cu descriptorul %d comanda: %s", fd, buffer);
+
                     //parsam comanda
                     struct Command cmd = parse_Command(buffer);
                     if(cmd.isValid){
@@ -158,7 +147,7 @@ int main(int argc, char* argv[]){
                         }
                     }else {
                         printf("[server] Comanda primita este invalida.\n");
-                        if(send_Message(fd,"Invalid command") < 0){
+                        if(send_Message(fd,cmd.errorMsg) < 0){
                             perror("[server] Error: send_Message()\n");
                             return errno;
                         }
@@ -179,13 +168,13 @@ int main(int argc, char* argv[]){
 
 int send_Message( int fd, char* message ){
     int bytes;			
-    char msg_answ[100]="";        //mesaj de raspuns pentru client
+    char msg_answ[message_len];        //mesaj de raspuns pentru client
 
     //preg mesajul 
-    bzero(msg_answ,100);
-
-    strcpy(msg_answ, message);
-    bytes = strlen (msg_answ);
+    memset(msg_answ, 0, message_len);
+    strncpy(msg_answ, message, message_len - 1);
+    msg_answ[message_len - 1] = '\0';
+    bytes = strlen(msg_answ);
 
     //printf("D: [server]Trimitem mesajul inapoi...%s\n",msg_answ);   
     if(bytes <= 0){
