@@ -48,7 +48,10 @@ int main(int argc, char* argv[]){
     }
 
     //setam SO_REUSEADDR
-    setsockopt(sd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
+    if( setsockopt(sd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)) == -1){
+        perror("[server] Error: socketsopt()\n");
+        return errno;
+    }
 
     //prepar structurile:
     bzero (&server, sizeof (server));
