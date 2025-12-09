@@ -128,10 +128,10 @@ int main(int argc, char* argv[]){
                 char buffer[message_len];
                 bzero(buffer, sizeof(buffer));
 
-                int bytesRead = recv(fd, buffer, sizeof(buffer)-1, 0);
+                int bytesRead = read(fd, buffer, message_len);
                 //int bytesRead = recive_Message(fd, buffer);
                 if(bytesRead < 0){
-                    perror("[server] Error: recv()\n");
+                    perror("[server] Error: read()\n");
                     return errno;
                 }else if(bytesRead == 0){
                     //conexiunea s-a inchis
@@ -188,14 +188,14 @@ int send_Message( int fd, char* message ){
         perror ("[server] Error strlen() \n");
         return -1;
     }
-    if(send(fd, &bytes, sizeof(bytes), 0) < 0){
-        perror("[server] Error send length to client\n");
+    if(write(fd, &bytes, sizeof(bytes)) < 0){
+        perror("[server] Error write length to client\n");
         return -1;
     }
     
-    if (bytes && send(fd, msg_answ, bytes, 0) < 0)
+    if (bytes && write(fd, msg_answ, bytes) < 0)
     {
-        perror ("[server] Error send() to client\n");
+        perror ("[server] Error write() to client\n");
         return -1;
     }
 
@@ -207,7 +207,7 @@ int recive_Message(int fd, char* buffer){
 
     //citim lungimea mesajului
     int n = 0;
-    n = recv(fd, &bytes, sizeof(bytes), 0);
+    n = read(fd, &bytes, sizeof(bytes));
 
     if(n < 0){
         perror ("[server] Error read length from client\n");
@@ -221,7 +221,7 @@ int recive_Message(int fd, char* buffer){
         return -1;
     }else {
         //citim mesajul
-        n = recv(fd, buffer, bytes, 0);
+        n = read(fd, buffer, bytes);
         if(n < 0){
             perror ("[server] Error read() from client\n");
             return -1;

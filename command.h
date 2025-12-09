@@ -7,6 +7,7 @@
 #include <string.h>
 #include <signal.h>
 #include <arpa/inet.h>
+#include <ctype.h>
 
 
 #define message_len 512
@@ -30,7 +31,6 @@ typedef enum{
 struct Command{
     CommandType type;
     char args[64];
-    int  arg_valid;
     bool isValid;
     char errorMsg[128];
 };

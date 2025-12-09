@@ -45,9 +45,10 @@ struct Command parse_Command(const char* commandStr){
                         cmd.isValid = false;
                         strcpy(cmd.errorMsg, "Invalid IP address format");
                         return cmd;
+                    }else {
+                        cmd.isValid = true;
+                        return cmd;
                     }
-                    cmd.isValid = true;
-                    return cmd;
                 }else {
                     //lipsa arg
                     cmd.isValid = false;
@@ -69,9 +70,10 @@ struct Command parse_Command(const char* commandStr){
                         cmd.isValid = false;
                         strcpy(cmd.errorMsg, "Max TTL must be between 1 and 64");
                         return cmd;
+                    }else {
+                        cmd.isValid = true;
+                        return cmd;
                     }
-                    cmd.isValid = true;
-                    return cmd;
                 }else {
                     //lipsa arg
                     cmd.isValid = false;
@@ -93,9 +95,10 @@ struct Command parse_Command(const char* commandStr){
                         cmd.isValid = false;
                         strcpy(cmd.errorMsg, "Interval must be between 1 and 3600 seconds");
                         return cmd;
+                    }else {
+                        cmd.isValid = true;
+                        return cmd;
                     }
-                    cmd.isValid = true;
-                    return cmd;
                 }else {
                     //lipsa arg
                     cmd.isValid = false;
@@ -117,9 +120,10 @@ struct Command parse_Command(const char* commandStr){
                         cmd.isValid = false;
                         strcpy(cmd.errorMsg, "Timeout must be between 10 and 5000 ms");
                         return cmd;
+                    }else{
+                        cmd.isValid = true;
+                        return cmd;
                     }
-                    cmd.isValid = true;
-                    return cmd;
                 }else {
                     //lipsa arg
                     cmd.isValid = false;
@@ -141,9 +145,10 @@ struct Command parse_Command(const char* commandStr){
                         cmd.isValid = false;
                         strcpy(cmd.errorMsg, "Probes must be between 1 and 10");
                         return cmd;
+                    }else{
+                        cmd.isValid = true;
+                        return cmd;
                     }
-                    cmd.isValid = true;
-                    return cmd;
                 }else {
                     //lipsa arg
                     cmd.isValid = false;
@@ -228,32 +233,53 @@ struct Command parse_Command(const char* commandStr){
     return cmd;
 } //end functie parseCommand
 
-bool validate_ip(const char *arg) {
+bool validate_ip(const char *arg){
     struct sockaddr_in sa;
     return inet_pton(AF_INET, arg, &(sa.sin_addr)) == 1;
 }
-bool validate_maxttl(const char *arg) {
+bool validate_maxttl(const char *arg){
+    for (int i = 0; arg[i] != '\0'; i++) {
+        if (!isdigit(arg[i])) {
+            return false;  
+        }
+    }
     int ttl = atoi(arg);
     if (ttl < 1 || ttl > 64)
         return false;
     return true;
 }
-bool validate_interval(const char *arg) {
+bool validate_interval(const char *arg){
+    for(int i = 0; arg[i] != '\0'; i++){
+        if (!isdigit(arg[i])){
+            return false;  
+        }
+    }
     int sec = atoi(arg);
     if (sec < 1 || sec > 3600)
         return false;
     return true;
 }
 
-bool validate_timeout(const char *arg) {
+bool validate_timeout(const char *arg){
+    for(int i = 0; arg[i] != '\0'; i++){
+        if (!isdigit(arg[i])){
+            return false;  
+        }
+    }
     int ms = atoi(arg);
-    if (ms < 10 || ms > 5000)
+    if(ms < 10 || ms > 5000)
         return false;
     return true;
 }
-bool validate_probes(const char *arg) {
+bool validate_probes(const char *arg){
+    for(int i = 0; arg[i] != '\0'; i++){
+        if (!isdigit(arg[i])){
+            return false;  
+        }
+    }
+    
     int p = atoi(arg);
-    if (p < 1 || p > 10)
+    if(p < 1 || p > 10)
         return false;
     return true;
 }
