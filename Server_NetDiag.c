@@ -148,10 +148,6 @@ int main(int argc, char* argv[]){
                     struct Command cmd = parse_Command(buffer);
                     if(cmd.isValid){
                         command_Executor(fd,cmd);
-                        if(send_Message(fd,"Command executed successfully") < 0){
-                            perror("[server] Error: send_Message()\n");
-                            return errno;
-                        }
                     }else {
                         printf("[server] Comanda primita este invalida.\n");
                         if(send_Message(fd,cmd.errorMsg) < 0){
