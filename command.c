@@ -9,7 +9,7 @@ struct Command parse_Command(const char* commandStr){
     cmd.isValid = false;
 
     //analizam inputul 
-    char buffer[MESSAGE_LEN];  // Now uses compile-time constant
+    char buffer[message_len];  // Now uses compile-time constant
     strncpy(buffer, commandStr, sizeof(buffer)-1);
     buffer[sizeof(buffer)-1] = '\0';
     //analizamcomanda primita de la client si o stocam in structura P_Command
@@ -41,6 +41,11 @@ struct Command parse_Command(const char* commandStr){
                         strcpy(cmd.errorMsg, "Too many arguments for 'set dest'");
                         return cmd;
                     }
+                    if(!validate_ip(cmd.args)) {
+                        cmd.isValid = false;
+                        strcpy(cmd.errorMsg, "Invalid IP address format");
+                        return cmd;
+                    }
                     cmd.isValid = true;
                     return cmd;
                 }else {
@@ -58,6 +63,11 @@ struct Command parse_Command(const char* commandStr){
                         //prea multi arg
                         cmd.isValid = false;
                         strcpy(cmd.errorMsg, "Too many arguments for 'set maxttl'");
+                        return cmd;
+                    }
+                    if(!validate_maxttl(cmd.args)) {
+                        cmd.isValid = false;
+                        strcpy(cmd.errorMsg, "Max TTL must be between 1 and 64");
                         return cmd;
                     }
                     cmd.isValid = true;
@@ -79,6 +89,11 @@ struct Command parse_Command(const char* commandStr){
                         strcpy(cmd.errorMsg, "Too many arguments for 'set interval'");
                         return cmd;
                     }
+                    if(!validate_interval(cmd.args)) {
+                        cmd.isValid = false;
+                        strcpy(cmd.errorMsg, "Interval must be between 1 and 3600 seconds");
+                        return cmd;
+                    }
                     cmd.isValid = true;
                     return cmd;
                 }else {
@@ -98,6 +113,11 @@ struct Command parse_Command(const char* commandStr){
                         strcpy(cmd.errorMsg, "Too many arguments for 'set timeout'");
                         return cmd;
                     }
+                    if(!validate_timeout(cmd.args)) {
+                        cmd.isValid = false;
+                        strcpy(cmd.errorMsg, "Timeout must be between 10 and 5000 ms");
+                        return cmd;
+                    }
                     cmd.isValid = true;
                     return cmd;
                 }else {
@@ -115,6 +135,11 @@ struct Command parse_Command(const char* commandStr){
                         //prea multi arg
                         cmd.isValid = false;
                         strcpy(cmd.errorMsg, "Too many arguments for 'set probes'");
+                        return cmd;
+                    }
+                    if(!validate_probes(cmd.args)) {
+                        cmd.isValid = false;
+                        strcpy(cmd.errorMsg, "Probes must be between 1 and 10");
                         return cmd;
                     }
                     cmd.isValid = true;
@@ -177,36 +202,10 @@ struct Command parse_Command(const char* commandStr){
             cmd.isValid = true;
             return cmd;
         }
-    }else if(strcmp(token, "schedule") == 0){
-        //
-        token = strtok(NULL, " \n");
-        if(strcmp(token, "show") == 0){
-            cmd.type = CMD_SCHEDULE_SHOW;
-            if((token = strtok(NULL, " \n")) != NULL){
-                cmd.isValid = false;
-                strcpy(cmd.errorMsg, "Too many arguments for 'schedule show'");
-                return cmd;
-            }else {
-                cmd.isValid = true;
-                return cmd;
-            }
-        }
-    }else if(strcmp(token, "unschedule") == 0){
-        //
-        token = strtok(NULL, " \n");
-        if(strcmp(token, "show") == 0){
-            cmd.type = CMD_UNSCHEDULE_SHOW;
-            if((token = strtok(NULL, " \n")) != NULL){
-                cmd.isValid = false;
-                strcpy(cmd.errorMsg, "Too many arguments for 'unschedule show'");
-                return cmd;
-            }else {
-                cmd.isValid = true;
-                return cmd;
-            }
-        }
-        return cmd;
-    }else if(strcmp(token, "help") == 0){
+    }
+    /* aici a fost schedule*/
+    
+    else if(strcmp(token, "help") == 0){
         //help
         cmd.type = CMD_HELP;
         cmd.isValid = true;
@@ -229,54 +228,32 @@ struct Command parse_Command(const char* commandStr){
     return cmd;
 } //end functie parseCommand
 
+bool validate_ip(const char *arg) {
+    struct sockaddr_in sa;
+    return inet_pton(AF_INET, arg, &(sa.sin_addr)) == 1;
+}
+bool validate_maxttl(const char *arg) {
+    int ttl = atoi(arg);
+    if (ttl < 1 || ttl > 64)
+        return false;
+    return true;
+}
+bool validate_interval(const char *arg) {
+    int sec = atoi(arg);
+    if (sec < 1 || sec > 3600)
+        return false;
+    return true;
+}
 
-//preiau/executam comenzile:
-void command_Executor (struct Command cmd){
-    switch(cmd.type){
-        case CMD_SET_DEST:
-            printf("[server] Execut comanda SET DEST cu arg %s", cmd.args);
-            break;
-        case CMD_SET_MAXTTL:
-            printf("[server] Execut comanda SET MAXTTL cu arg %s", cmd.args);
-            break;
-        case CMD_SET_INTERVAL:
-            printf("[server] Execut comanda SET INTERVAL cu arg %s", cmd.args);
-            break;
-        case CMD_SET_TIMEOUT:
-            printf("[server] Execut comanda SET TIMEOUT cu arg %s", cmd.args);
-            break;
-        case CMD_SET_PROBES:
-            printf("[server] Execut comanda SET PROBES cu arg %s", cmd.args);
-            break;
-        case CMD_START:
-            printf("[server] Execut comanda START");
-            break;
-        case CMD_STOP:
-            printf("[server] Execut comanda STOP");
-            break;
-        case CMD_RESET:
-            printf("[server] Execut comanda RESET");
-            break;
-        case CMD_REPORT:
-            printf("[server] Execut comanda REPORT");
-            break;
-        case CMD_SCHEDULE_SHOW:
-            printf("[server] Execut comanda SCHEDULE SHOW");
-            break;
-        case CMD_UNSCHEDULE_SHOW:
-            printf("[server] Execut comanda UNSCHEDULE SHOW");
-            break;
-        case CMD_HELP:
-            printf("[server] Execut comanda HELP");
-            break;
-        case CMD_QUIT:
-            printf("[server] Execut comanda QUIT");
-            break;
-        case CMD_INVALID:
-            printf("[server] Comanda invalida");
-            break;
-        default:
-            printf("[server] Comanda invalida");
-            break;
-    }
+bool validate_timeout(const char *arg) {
+    int ms = atoi(arg);
+    if (ms < 10 || ms > 5000)
+        return false;
+    return true;
+}
+bool validate_probes(const char *arg) {
+    int p = atoi(arg);
+    if (p < 1 || p > 10)
+        return false;
+    return true;
 }

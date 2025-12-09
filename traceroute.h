@@ -1,5 +1,6 @@
 #ifndef TRACEROUTE_H
 #define TRACEROUTE_H
+#include <netinet/ip.h>
 #include <netinet/ip_icmp.h>
 #include <arpa/inet.h>
 #include <asm-generic/socket.h>
@@ -12,6 +13,12 @@
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <stdbool.h>
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
+#define PID_MASK 0xFFFF
+#define PACKET_SIZE (sizeof(struct icmphdr) + sizeof(struct timeval))
 
 struct trace{
     char ip[64];
@@ -29,7 +36,7 @@ unsigned short check_Sum(void *b, int len);
 int send_Probe(int sd, const char *dest_ip, int ttl, int seq);
 
 //ascult/filtrez raspunsurile ICMP primite
-int recive_Reply(int sd, int pid, int seq, char *router_ip, long *rtt_ms);
+int recive_Reply(int sd, int pid, int seq, char *router_ip, long *rtt_ms, int timeout_ms);
 
 //functia de traceroute
 int traceroute(const char *dest_ip, int max_ttl, int timeout_ms, int interval_ms, int probes_per_ttl);

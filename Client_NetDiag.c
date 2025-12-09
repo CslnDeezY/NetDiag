@@ -14,16 +14,17 @@
 #include <string.h>
 
 extern int errno;
-#define message_len 516
+#define message_len 512
 int port;
 
 int recive_Message(int fd, char* buffer);
+int send_Message(int sd, char* buffer);
 
 int main (int argc, char *argv[])
 {
     int sd;			// socket descriptor
     struct sockaddr_in server;
-    char msg[100];		
+    char msg[message_len];		
 
     if(argc != 3){
         printf ("[client] Sintaxa: %s <adresa_server> <port>\n", argv[0]);
@@ -50,14 +51,14 @@ int main (int argc, char *argv[])
 
     while(true){
         //citirea mesajului 
-        bzero (msg, 100);
+        bzero (msg, message_len);
         printf ("[client]Introduceti comanda: ");
         fflush (stdout);
-        read (0, msg, 100);
+        read(0, msg, message_len-1);
 
         //triitem comanda
-        if(write (sd, msg, 100) <= 0){
-            perror ("[client]Eroare la write() spre server.\n");
+        if(send(sd, msg, strlen(msg), 0) < 0){
+            perror ("[client]Eroare la send() spre server.\n");
             return errno;
         }
         
@@ -78,19 +79,35 @@ int recive_Message(int fd, char* buffer){
     bzero(buffer, sizeof(&buffer));
 
     //citim lungimea mesajului
-    if(read (fd, &bytes, sizeof(bytes)) < 0){
-        perror ("[client] Error read length from server\n");
+    if(recv(fd, &bytes, sizeof(bytes), 0) < 0){
+        perror ("[client] Error recv length from server\n");
         return -1;
     }
 
     //citim mesajul
     if(bytes > 0){
-        if(read (fd, buffer, bytes) < 0){
-            perror ("[client] Error read() from server\n");
+        if(recv(fd, buffer, bytes, 0) < 0){
+            perror ("[client] Error recv() from server\n");
             return -1;
         }
     }
 
     printf ("[client]Am citit: %d bytes: %s\n", bytes, buffer);
+    return bytes;
+}
+
+int send_Message(int sd, char* buffer){
+    int bytes = strlen(buffer);
+    if(send(sd, &bytes, sizeof(bytes), 0) < 0){
+        perror("[client] Error send length to server\n");
+        return -1;
+    }
+    if(bytes > 0){
+        if(send(sd, buffer, bytes, 0) < 0){
+            perror("[client] Error send to server\n");
+            return -1;
+        }
+
+    }
     return bytes;
 }

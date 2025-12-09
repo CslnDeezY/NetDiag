@@ -6,8 +6,11 @@
 #include <stdbool.h>
 #include <string.h>
 #include <signal.h>
+#include <arpa/inet.h>
 
-#define MESSAGE_LEN 512 
+
+#define message_len 512
+
 
 typedef enum{
     CMD_INVALID = -1,
@@ -20,8 +23,6 @@ typedef enum{
     CMD_STOP = 6,
     CMD_RESET = 7,
     CMD_REPORT,
-    CMD_SCHEDULE_SHOW, 
-    CMD_UNSCHEDULE_SHOW,
     CMD_HELP, 
     CMD_QUIT
 } CommandType;
@@ -29,6 +30,7 @@ typedef enum{
 struct Command{
     CommandType type;
     char args[64];
+    int  arg_valid;
     bool isValid;
     char errorMsg[128];
 };
@@ -36,8 +38,12 @@ struct Command{
 //parsam comanda primita de la client si o stocam in structura Command
 struct Command parse_Command(const char* commandStr);
 
-//preiau/executam comenzile:
-void command_Executor (struct Command cmd);
+bool validate_ip(const char *arg);
+bool validate_maxttl(const char *arg);
+bool validate_interval(const char *arg);
+bool validate_timeout(const char *arg);
+bool validate_probes(const char *arg);
+
 
 
 
