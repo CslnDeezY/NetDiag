@@ -3,7 +3,7 @@
 
 extern int errno;
 #define message_len 512
-#define PORT 2728
+#define PORT 3686
 
 
 
@@ -82,7 +82,7 @@ int main(int argc, char* argv[]){
     tv.tv_sec = 2;
     tv.tv_usec = 0;
 
-    printf("[server] Wait at port: %d.........\n", PORT);
+    printf("[server] Wait at port: %d...\n", PORT);
     fflush(stdout);
 
     //abslujivaiem tioti clientii
@@ -257,6 +257,10 @@ void command_Executor (int fd, struct Command cmd){
         case CMD_SET_PROBES:
             printf("[server] Execut comanda SET PROBES cu arg %s", cmd.args);
             send_Message(fd, "Commanda SET PROBES inca nu este implementata\n");
+            break;
+        case CMD_SET_CYCLE:
+            printf("[server] Execut comanda SET CYCLE cu arg %s", cmd.args);
+            send_Message(fd, "Commanda SET CYCLE inca nu este implementata\n");
             break;
         case CMD_START:
             printf("[server] Execut comanda START");

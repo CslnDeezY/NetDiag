@@ -155,6 +155,31 @@ struct Command parse_Command(const char* commandStr){
                     strcpy(cmd.errorMsg, "Missing argument for 'set probes'");
                     return cmd;
                 }
+            }else if(strcmp(token, "cycle") == 0){
+                //set cycle <numar> seteaza numarul de cicluri pentru report
+                cmd.type = CMD_SET_CYCLE;
+                if((token = strtok(NULL, " \n")) != NULL){
+                    strcpy(cmd.args, token);
+                    if((token = strtok(NULL, " \n")) != NULL){
+                        //prea multi arg
+                        cmd.isValid = false;
+                        strcpy(cmd.errorMsg, "Too many arguments for 'set cycle'");
+                        return cmd;
+                    }
+                    if(!validate_cycle(cmd.args)) {
+                        cmd.isValid = false;
+                        strcpy(cmd.errorMsg, "Cycle must be between 1 and 64");
+                        return cmd;
+                    }else{
+                        cmd.isValid = true;
+                        return cmd;
+                    }
+                }else {
+                    //lipsa arg
+                    cmd.isValid = false;
+                    strcpy(cmd.errorMsg, "Missing argument for 'set cycle'");
+                    return cmd;
+                }
             }
         }
     } //end if "SET"
@@ -238,7 +263,8 @@ bool validate_ip(const char *arg){
     return inet_pton(AF_INET, arg, &(sa.sin_addr)) == 1;
 }
 bool validate_maxttl(const char *arg){
-    for (int i = 0; arg[i] != '\0'; i++) {
+    int i;
+    for (i = 0; arg[i] != '\0'; i++) {
         if (!isdigit(arg[i])) {
             return false;  
         }
@@ -249,19 +275,21 @@ bool validate_maxttl(const char *arg){
     return true;
 }
 bool validate_interval(const char *arg){
-    for(int i = 0; arg[i] != '\0'; i++){
+    int i;
+    for(i = 0; arg[i] != '\0'; i++){
         if (!isdigit(arg[i])){
             return false;  
         }
     }
     int sec = atoi(arg);
-    if (sec < 1 || sec > 3600)
+    if (sec < 1 || sec > 360)
         return false;
     return true;
 }
 
 bool validate_timeout(const char *arg){
-    for(int i = 0; arg[i] != '\0'; i++){
+    int i;
+    for(i = 0; arg[i] != '\0'; i++){
         if (!isdigit(arg[i])){
             return false;  
         }
@@ -272,7 +300,8 @@ bool validate_timeout(const char *arg){
     return true;
 }
 bool validate_probes(const char *arg){
-    for(int i = 0; arg[i] != '\0'; i++){
+    int i;
+    for(i = 0; arg[i] != '\0'; i++){
         if (!isdigit(arg[i])){
             return false;  
         }
@@ -280,6 +309,19 @@ bool validate_probes(const char *arg){
     
     int p = atoi(arg);
     if(p < 1 || p > 10)
+        return false;
+    return true;
+}
+bool validate_cycle(const char  *arg){
+    int i;
+    for(i = 0; arg[i] != '\0'; i++){
+        if (!isdigit(arg[i])){
+            return false;  
+        }
+    }
+    
+    int cycle = atoi(arg);
+    if(cycle < 1 || cycle > 64)
         return false;
     return true;
 }

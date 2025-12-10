@@ -20,9 +20,10 @@ typedef enum{
     CMD_SET_INTERVAL = 2,
     CMD_SET_TIMEOUT = 3,
     CMD_SET_PROBES = 4,
-    CMD_START = 5,
-    CMD_STOP = 6,
-    CMD_RESET = 7,
+    CMD_SET_CYCLE,
+    CMD_START,
+    CMD_STOP,
+    CMD_RESET,
     CMD_REPORT,
     CMD_HELP, 
     CMD_QUIT
@@ -43,6 +44,7 @@ bool validate_maxttl(const char *arg);
 bool validate_interval(const char *arg);
 bool validate_timeout(const char *arg);
 bool validate_probes(const char *arg);
+bool validate_cycle(const char  *arg);
 
 
 
