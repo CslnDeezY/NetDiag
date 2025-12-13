@@ -1,13 +1,15 @@
 #ifndef TRACEROUTE_H
 #define TRACEROUTE_H
-#include <netinet/ip.h>
-#include <netinet/ip_icmp.h>
+
 #include <arpa/inet.h>
 #include <asm-generic/socket.h>
+#include <ctype.h>
 #include <errno.h>
 #include <strings.h>
 #include <unistd.h>
 #include <netinet/in.h>
+#include <netinet/ip_icmp.h>
+#include <signal.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/select.h>
@@ -15,6 +17,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 #include <stdlib.h>
 
 #define PID_MASK 0xFFFF

@@ -1,0 +1,44 @@
+            Comenzi disponibile:
+============================================
+
+Comenzi pentru configurare:    
+______________________________________________        
+
+-- set dest <IP>            -Seteaza adresa Ip a destinatiei catre care se face trace-ul (default 127.0.0.1)
+
+-- set maxttl <number>      -Setează TTL maxim (default 30)
+
+-- set interval <secunde>   -Intervalul de actualizare (default 1s)
+
+-- set timeout <ms>         -Timeout pe hop (default 500ms)
+
+-- set probes <number>       -Numarul de pachete trimise la fiecare actualizare (default 3)
+
+-- set cycle <number>        -Numarul de cicluri de trimitere a pachetelor (default 10)
+
+______________________________________________
+
+Comenzi pentru controlul trace-ului:
+______________________________________________
+
+-- start                    -Porneste procesul de traceroute
+
+-- stop                     -Opreste procesul de traceroute
+
+-- reset                    -Reporneste traceroute-ul de la inceput
+
+______________________________________________
+
+Comenzi pentru afișare / raportare:
+______________________________________________
+
+-- report                   -Afiseaza raportul traceroute-ului
+
+______________________________________________
+
+Comenzi administrative:
+
+-- help                     -Afiseaza aceasta lista de comenzi
+
+-- quit                     -Iesi din aplicatie
+______________________________________________

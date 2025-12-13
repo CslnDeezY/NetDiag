@@ -1,13 +1,8 @@
 #ifndef COMMAND_H
 #define COMMAND_H
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdbool.h>
-#include <string.h>
-#include <signal.h>
-#include <arpa/inet.h>
-#include <ctype.h>
+#include "traceroute.h"
+
 
 
 #define message_len 512
@@ -36,15 +31,37 @@ struct Command{
     char errorMsg[128];
 };
 
+//trimite un mesaj catre client:
+int send_Message( int fd, char* message );
+int recive_Message(int fd, char* buffer);
+
 //parsam comanda primita de la client si o stocam in structura Command
 struct Command parse_Command(const char* commandStr);
 
+//functiile de validare a argumentelor pentru fiecare comanda
 bool validate_ip(const char *arg);
 bool validate_maxttl(const char *arg);
 bool validate_interval(const char *arg);
 bool validate_timeout(const char *arg);
 bool validate_probes(const char *arg);
 bool validate_cycle(const char  *arg);
+
+//preiau/executam comenzile:
+void command_Executor(int fd, struct Command cmd);
+
+//functii de implementare a comenzilor
+void execute_set_dest(int fd, const char *arg);
+void execute_set_maxttl(int fd, const char *arg);
+void execute_set_interval(int fd, const char *arg);
+void execute_set_timeout(int fd, const char *arg);
+void execute_set_probes(int fd, const char *arg);
+void execute_set_cycle(int fd, const char *arg);
+void execute_start(int fd);
+void execute_stop(int fd);
+void execute_reset(int fd);
+void execute_report(int fd);
+void execute_help(int fd);
+void execute_quit(int fd);
 
 
 

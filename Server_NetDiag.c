@@ -1,18 +1,10 @@
 #include "command.h"
-#include "traceroute.h"
 
 extern int errno;
 #define message_len 512
 #define PORT 3686
 
 
-
-
-//trimite un mesaj catre client:
-int send_Message( int fd, char* message );
-int recive_Message(int fd, char* buffer);
-//preiau/executam comenzile:
-void command_Executor(int fd, struct Command cmd);
 
 //IP to string
 char *conv_Addr(struct sockaddr_in address) {
@@ -116,7 +108,7 @@ int main(int argc, char* argv[]){
             //adaug la lista de socketi activi:
             FD_SET(client, &actfds);
 
-            printf("[server] S-a conectat clientul cu descriptorul %d, de la adresa %s.\n",client, conv_Addr (from));
+            printf("[server] The client with descriptor %d, from address %s, has connected\n",client, conv_Addr (from));
             fflush (stdout);
         }
 
@@ -135,21 +127,21 @@ int main(int argc, char* argv[]){
                     return errno;
                 }else if(bytesRead == 0){
                     //conexiunea s-a inchis
-                    printf("[server] S-a deconectat clientul cu descriptorul %d, de la adresa %s.\n",fd, conv_Addr (from));
+                    printf("[server] The client with descriptor %d disconnected from address %s\n",fd, conv_Addr (from));
                     fflush (stdout);
                     close(fd);
                     FD_CLR(fd, &actfds);
                 }else {
                     //am primit date
                     buffer[bytesRead] = '\0';
-                    printf("[server] Am primit de la clientul cu descriptorul %d comanda: %s", fd, buffer);
+                    printf("[server] Received command from client with descriptor %d: %s", fd, buffer);
 
                     //parsam comanda
                     struct Command cmd = parse_Command(buffer);
                     if(cmd.isValid){
                         command_Executor(fd,cmd);
                     }else {
-                        printf("[server] Comanda primita este invalida.\n");
+                        printf("[server] Invalid command\n");
                         if(send_Message(fd,cmd.errorMsg) < 0){
                             perror("[server] Error: send_Message()\n");
                             return errno;
@@ -168,129 +160,3 @@ int main(int argc, char* argv[]){
 
 }   //end manin
 
-
-int send_Message( int fd, char* message ){
-    int bytes;			
-    char msg_answ[message_len];        //mesaj de raspuns pentru client
-
-    //preg mesajul 
-    memset(msg_answ, 0, message_len);
-    strncpy(msg_answ, message, message_len - 1);
-    msg_answ[message_len - 1] = '\0';
-    bytes = strlen(msg_answ);
-
-    //printf("D: [server]Trimitem mesajul inapoi...%s\n",msg_answ);   
-    if(bytes <= 0){
-        perror ("[server] Error strlen() \n");
-        return -1;
-    }
-    if(write(fd, &bytes, sizeof(bytes)) < 0){
-        perror("[server] Error write length to client\n");
-        return -1;
-    }
-    
-    if (bytes && write(fd, msg_answ, bytes) < 0)
-    {
-        perror ("[server] Error write() to client\n");
-        return -1;
-    }
-
-    return bytes;
-}
-int recive_Message(int fd, char* buffer){
-    int bytes = 0;
-    bzero(buffer, message_len);
-
-    //citim lungimea mesajului
-    int n = 0;
-    n = read(fd, &bytes, sizeof(bytes));
-
-    if(n < 0){
-        perror ("[server] Error read length from client\n");
-        return -1;
-    }else if(n == 0){
-        //conexiunea s-a inchis
-        return 0;
-    }
-    if(bytes <= 0 || bytes > message_len){
-        perror ("[server] Error: invalid message length\n");
-        return -1;
-    }else {
-        //citim mesajul
-        n = read(fd, buffer, bytes);
-        if(n < 0){
-            perror ("[server] Error read() from client\n");
-            return -1;
-        }
-        else if(n == 0){
-            //conexiunea s-a inchis
-            return 0;
-        }
-
-    }
-
-    buffer[bytes] = '\0';
-    printf ("[server]Am citit: %d bytes: %s\n", bytes, buffer);
-
-    return bytes;
-}
-
-//preiau/executam comenzile:
-void command_Executor (int fd, struct Command cmd){
-    switch(cmd.type){
-        case CMD_SET_DEST:
-            printf("[server] Execut comanda SET DEST cu arg %s", cmd.args);
-            send_Message(fd, "Comanda SET DEST inca nu este implementata\n");
-            break;
-        case CMD_SET_MAXTTL:
-            printf("[server] Execut comanda SET MAXTTL cu arg %s", cmd.args);
-            send_Message(fd, "Commanda SET MAXTTL inca nu este implementata\n");
-            break;
-        case CMD_SET_INTERVAL:
-            printf("[server] Execut comanda SET INTERVAL cu arg %s", cmd.args);
-            send_Message(fd, "Commanda SET INTERVAL inca nu este implementata\n");
-            break;
-        case CMD_SET_TIMEOUT:
-            printf("[server] Execut comanda SET TIMEOUT cu arg %s", cmd.args);
-            send_Message(fd, "Commanda SET TIMEOUT inca nu este implementata\n");
-            break;
-        case CMD_SET_PROBES:
-            printf("[server] Execut comanda SET PROBES cu arg %s", cmd.args);
-            send_Message(fd, "Commanda SET PROBES inca nu este implementata\n");
-            break;
-        case CMD_SET_CYCLE:
-            printf("[server] Execut comanda SET CYCLE cu arg %s", cmd.args);
-            send_Message(fd, "Commanda SET CYCLE inca nu este implementata\n");
-            break;
-        case CMD_START:
-            printf("[server] Execut comanda START");
-            send_Message(fd, "Commanda START inca nu este implementata\n");
-            break;
-        case CMD_STOP:
-            printf("[server] Execut comanda STOP");
-            send_Message(fd, "Commanda STOP inca nu este implementata\n");
-            break;
-        case CMD_RESET:
-            printf("[server] Execut comanda RESET");
-            send_Message(fd, "Commanda RESET inca nu este implementata\n");
-            break;
-        case CMD_REPORT:
-            printf("[server] Execut comanda REPORT");
-            send_Message(fd, "Commanda REPORT inca nu este implementata\n");
-            break;
-        case CMD_HELP:
-            printf("[server] Execut comanda HELP");
-            send_Message(fd, "Commanda HELP inca nu este implementata\n");
-            break;
-        case CMD_QUIT:
-            printf("[server] Execut comanda QUIT");
-            send_Message(fd, "Commanda QUIT inca nu este implementata\n");
-            break;
-        case CMD_INVALID:
-            printf("[server] Comanda invalida");
-            break;
-        default:
-            printf("[server] Comanda invalida");
-            break;
-    }
-}
