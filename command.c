@@ -1,4 +1,5 @@
 #include "command.h"
+#include <ctype.h>
 
 //functiile de trimitere si receptare de mesaje
 int send_Message( int fd, char* message ){
@@ -426,7 +427,9 @@ void command_Executor (int fd, struct Command cmd){
             break;
         case CMD_START:
             printf("[server] Execute command START");
-            send_Message(fd, "Commanda START inca nu este implementata\n");
+            //send_Message(fd, "Commanda START inca nu este implementata\n");
+            execute_start(fd);
+            printf("[server] Commanda START executata\n");
             break;
         case CMD_STOP:
             printf("[server] Execute command STOP");
@@ -468,7 +471,12 @@ void execute_set_interval(int fd, const char *arg){}
 void execute_set_timeout(int fd, const char *arg){}
 void execute_set_probes(int fd, const char *arg){}
 void execute_set_cycle(int fd, const char *arg){}
-void execute_start(int fd){}
+void execute_start(int fd){
+    if( traceroute(fd, "8.8.8.8", 19, 1000, 500, 1) < 0 ){
+        send_Message(fd, "Traceroute failed due to an error.\n");
+        return;
+    }
+}
 void execute_stop(int fd){}
 void execute_reset(int fd){}
 void execute_report(int fd){}
