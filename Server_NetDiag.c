@@ -4,20 +4,16 @@ extern int errno;
 #define message_len 512
 #define PORT 3686
 
+//tablou de configurari pentru fiecare client
+struct trace_config client_configs[FD_SETSIZE];
 
-
-//IP to string
-char *conv_Addr(struct sockaddr_in address) {
-    static char str[25];
-    char port[7];
-
-    //IP client
-    strcpy (str, inet_ntoa (address.sin_addr));
-    //port client
-    bzero (port, 7);
-    sprintf (port, ":%d", ntohs (address.sin_port));
-    strcat (str, port);
-    return (str);
+void set_default_config(int fd_client){
+    strcpy(client_configs[fd_client].dest_ip, "127.0.0.1"); //localhost
+    client_configs[fd_client].max_ttl = 30;
+    client_configs[fd_client].timeout_ms = 3000;      //3 secunde
+    client_configs[fd_client].interval_ms = 1000;     //1 secunda
+    client_configs[fd_client].probes_per_ttl = 3;
+    client_configs[fd_client].cycle = 1;
 }
 
 
@@ -101,6 +97,7 @@ int main(int argc, char* argv[]){
                 return errno;
             }
 
+            set_default_config(client); //setez config default pt client (la fiecare client nou aceasta se reseteaza la valorile default indiferent de fd)
             if(client > nfds){
                 nfds = client;
             }
@@ -139,7 +136,7 @@ int main(int argc, char* argv[]){
                     //parsam comanda
                     struct Command cmd = parse_Command(buffer);
                     if(cmd.isValid){
-                        command_Executor(fd,cmd);
+                        command_Executor(fd,cmd, &client_configs[fd]);
                     }else {
                         printf("[server] Invalid command\n");
                         if(send_Message(fd,cmd.errorMsg) < 0){

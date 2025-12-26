@@ -1,5 +1,17 @@
 #include "traceroute.h"
 
+//populeaza structura de configurare cu valori implicite
+struct trace_config default_trace_config(){
+    struct trace_config cfg;
+    strcpy(cfg.dest_ip, "127.0.0.1"); //localhost
+    cfg.max_ttl = 30;
+    cfg.timeout_ms = 3000;      //3 secunde
+    cfg.interval_ms = 1000;     //1 secunda
+    cfg.probes_per_ttl = 3;
+    cfg.cycle = 1;
+    return cfg;
+}
+
 unsigned short check_Sum(void *b, int len){
     unsigned short *buf = b;
     unsigned int sum = 0;

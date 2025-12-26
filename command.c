@@ -1,5 +1,6 @@
 #include "command.h"
-#include <ctype.h>
+#include "traceroute.h"
+#include <stdio.h>
 
 //functiile de trimitere si receptare de mesaje
 int send_Message( int fd, char* message ){
@@ -72,6 +73,19 @@ int recive_Message(int fd, char* buffer){
 }
 */
 
+//IP to string
+char *conv_Addr(struct sockaddr_in address) {
+    static char str[25];
+    char port[7];
+
+    //IP client
+    strcpy (str, inet_ntoa (address.sin_addr));
+    //port client
+    bzero (port, 7);
+    sprintf (port, ":%d", ntohs (address.sin_port));
+    strcat (str, port);
+    return (str);
+}
 
 //parsam comanda primita de la client si o stocam in structura Command
 struct Command parse_Command(const char* commandStr){
@@ -99,23 +113,23 @@ struct Command parse_Command(const char* commandStr){
         if(token == NULL){
             perror("[server] Eroare ParseCommand: comanda SET incompleta\n");
             cmd.isValid = false;
-            strcpy(cmd.errorMsg, "Incomplet set command");
+            strcpy(cmd.errorMsg, "Incomplet set command\n");
             return cmd;
         }else {
             if(strcmp(token, "dest") == 0){
                 //SET DEST <IP> Seteaza destinatia traceroute-ului
                 cmd.type = CMD_SET_DEST;
                 if((token = strtok(NULL, " \n")) != NULL){
-                    strcpy(cmd.args, token);
+                    strcpy(cmd.arg, token);
                     if((token = strtok(NULL, " \n")) != NULL){
                         //prea multi arg
                         cmd.isValid = false;
-                        strcpy(cmd.errorMsg, "Too many arguments for 'set dest'");
+                        strcpy(cmd.errorMsg, "Too many arguments for 'set dest'\n");
                         return cmd;
                     }
-                    if(!validate_ip(cmd.args)) {
+                    if(!validate_ip(cmd.arg)) {
                         cmd.isValid = false;
-                        strcpy(cmd.errorMsg, "Invalid IP address format");
+                        strcpy(cmd.errorMsg, "Invalid IP address format\n");
                         return cmd;
                     }else {
                         cmd.isValid = true;
@@ -124,23 +138,23 @@ struct Command parse_Command(const char* commandStr){
                 }else {
                     //lipsa arg
                     cmd.isValid = false;
-                    strcpy(cmd.errorMsg, "Missing argument for 'set dest'");
+                    strcpy(cmd.errorMsg, "Missing argument for 'set dest'\n");
                     return cmd;
                 }
             }else if(strcmp(token, "maxttl") == 0){
                 //Seteaza TTL maxim
                 cmd.type = CMD_SET_MAXTTL;
                 if((token = strtok(NULL, " \n")) != NULL){
-                    strcpy(cmd.args, token);
+                    strcpy(cmd.arg, token);
                     if((token = strtok(NULL, " \n")) != NULL){
                         //prea multi arg
                         cmd.isValid = false;
-                        strcpy(cmd.errorMsg, "Too many arguments for 'set maxttl'");
+                        strcpy(cmd.errorMsg, "Too many arguments for 'set maxttl'\n");
                         return cmd;
                     }
-                    if(!validate_maxttl(cmd.args)) {
+                    if(!validate_maxttl(cmd.arg)) {
                         cmd.isValid = false;
-                        strcpy(cmd.errorMsg, "Max TTL must be between 1 and 64");
+                        strcpy(cmd.errorMsg, "Max TTL must be between 1 and 64\n");
                         return cmd;
                     }else {
                         cmd.isValid = true;
@@ -149,23 +163,23 @@ struct Command parse_Command(const char* commandStr){
                 }else {
                     //lipsa arg
                     cmd.isValid = false;
-                    strcpy(cmd.errorMsg, "Missing argument for 'set maxttl'");
+                    strcpy(cmd.errorMsg, "Missing argument for 'set maxttl'\n");
                     return cmd;
                 }
             }else if(strcmp(token, "interval") == 0){
                 //SET INTERVAL <secunde> Intervalul de actualizare
                 cmd.type = CMD_SET_INTERVAL;
                 if((token = strtok(NULL, " \n")) != NULL){
-                    strcpy(cmd.args, token);
+                    strcpy(cmd.arg, token);
                     if((token = strtok(NULL, " \n")) != NULL){
                         //prea multi arg
                         cmd.isValid = false;
-                        strcpy(cmd.errorMsg, "Too many arguments for 'set interval'");
+                        strcpy(cmd.errorMsg, "Too many arguments for 'set interval'\n");
                         return cmd;
                     }
-                    if(!validate_interval(cmd.args)) {
+                    if(!validate_interval(cmd.arg)) {
                         cmd.isValid = false;
-                        strcpy(cmd.errorMsg, "Interval must be between 1 and 3600 seconds");
+                        strcpy(cmd.errorMsg, "Interval must be between 1 and 3600 seconds\n");
                         return cmd;
                     }else {
                         cmd.isValid = true;
@@ -174,23 +188,23 @@ struct Command parse_Command(const char* commandStr){
                 }else {
                     //lipsa arg
                     cmd.isValid = false;
-                    strcpy(cmd.errorMsg, "Missing argument for 'set interval'");
+                    strcpy(cmd.errorMsg, "Missing argument for 'set interval'\n");
                     return cmd;
                 }
             }else if(strcmp(token, "timeout") == 0){
                 //SET TIMEOUT <ms> Timeout pe hop
                 cmd.type = CMD_SET_TIMEOUT;
                 if((token = strtok(NULL, " \n")) != NULL){
-                    strcpy(cmd.args, token);
+                    strcpy(cmd.arg, token);
                     if((token = strtok(NULL, " \n")) != NULL){
                         //prea multi arg
                         cmd.isValid = false;
-                        strcpy(cmd.errorMsg, "Too many arguments for 'set timeout'");
+                        strcpy(cmd.errorMsg, "Too many arguments for 'set timeout'\n");
                         return cmd;
                     }
-                    if(!validate_timeout(cmd.args)) {
+                    if(!validate_timeout(cmd.arg)) {
                         cmd.isValid = false;
-                        strcpy(cmd.errorMsg, "Timeout must be between 10 and 5000 ms");
+                        strcpy(cmd.errorMsg, "Timeout must be between 10 and 5000 ms\n");
                         return cmd;
                     }else{
                         cmd.isValid = true;
@@ -199,23 +213,23 @@ struct Command parse_Command(const char* commandStr){
                 }else {
                     //lipsa arg
                     cmd.isValid = false;
-                    strcpy(cmd.errorMsg, "Missing argument for 'set timeout'");
+                    strcpy(cmd.errorMsg, "Missing argument for 'set timeout'\n");
                     return cmd;
                 }
             }else if(strcmp(token, "probes") == 0){
                 //SET PROBES <număr> Numărul de pachete trimise la fiecare actualizare
                 cmd.type = CMD_SET_PROBES;
                 if((token = strtok(NULL, " \n")) != NULL){
-                    strcpy(cmd.args, token);
+                    strcpy(cmd.arg, token);
                     if((token = strtok(NULL, " \n")) != NULL){
                         //prea multi arg
                         cmd.isValid = false;
-                        strcpy(cmd.errorMsg, "Too many arguments for 'set probes'");
+                        strcpy(cmd.errorMsg, "Too many arguments for 'set probes'\n");
                         return cmd;
                     }
-                    if(!validate_probes(cmd.args)) {
+                    if(!validate_probes(cmd.arg)) {
                         cmd.isValid = false;
-                        strcpy(cmd.errorMsg, "Probes must be between 1 and 10");
+                        strcpy(cmd.errorMsg, "Probes must be between 1 and 10\n");
                         return cmd;
                     }else{
                         cmd.isValid = true;
@@ -224,23 +238,23 @@ struct Command parse_Command(const char* commandStr){
                 }else {
                     //lipsa arg
                     cmd.isValid = false;
-                    strcpy(cmd.errorMsg, "Missing argument for 'set probes'");
+                    strcpy(cmd.errorMsg, "Missing argument for 'set probes'\n");
                     return cmd;
                 }
             }else if(strcmp(token, "cycle") == 0){
                 //set cycle <numar> seteaza numarul de cicluri pentru report
                 cmd.type = CMD_SET_CYCLE;
                 if((token = strtok(NULL, " \n")) != NULL){
-                    strcpy(cmd.args, token);
+                    strcpy(cmd.arg, token);
                     if((token = strtok(NULL, " \n")) != NULL){
                         //prea multi arg
                         cmd.isValid = false;
-                        strcpy(cmd.errorMsg, "Too many arguments for 'set cycle'");
+                        strcpy(cmd.errorMsg, "Too many arguments for 'set cycle'\n");
                         return cmd;
                     }
-                    if(!validate_cycle(cmd.args)) {
+                    if(!validate_cycle(cmd.arg)) {
                         cmd.isValid = false;
-                        strcpy(cmd.errorMsg, "Cycle must be between 1 and 64");
+                        strcpy(cmd.errorMsg, "Cycle must be between 1 and 64\n");
                         return cmd;
                     }else{
                         cmd.isValid = true;
@@ -249,7 +263,7 @@ struct Command parse_Command(const char* commandStr){
                 }else {
                     //lipsa arg
                     cmd.isValid = false;
-                    strcpy(cmd.errorMsg, "Missing argument for 'set cycle'");
+                    strcpy(cmd.errorMsg, "Missing argument for 'set cycle'\n");
                     return cmd;
                 }
             }
@@ -262,7 +276,7 @@ struct Command parse_Command(const char* commandStr){
         if((token = strtok(NULL, " \n")) != NULL){
             //prea multi arg
             cmd.isValid = false;
-            strcpy(cmd.errorMsg, "Too many arguments for 'start'");
+            strcpy(cmd.errorMsg, "Too many arguments for 'start'\n");
             return cmd;
         }else {
             cmd.isValid = true;
@@ -274,7 +288,7 @@ struct Command parse_Command(const char* commandStr){
         if((token = strtok(NULL, " \n")) != NULL){
             //prea multi arg
             cmd.isValid = false;
-            strcpy(cmd.errorMsg, "Too many arguments for 'stop'");
+            strcpy(cmd.errorMsg, "Too many arguments for 'stop'\n");
             return cmd;
         }else {
             cmd.isValid = true;
@@ -286,7 +300,7 @@ struct Command parse_Command(const char* commandStr){
         if((token = strtok(NULL, " \n")) != NULL){
             //prea multi arg
             cmd.isValid = false;
-            strcpy(cmd.errorMsg, "Too many arguments for 'reset'");
+            strcpy(cmd.errorMsg, "Too many arguments for 'reset'\n");
             return cmd;
         }else {
             cmd.isValid = true;
@@ -298,7 +312,7 @@ struct Command parse_Command(const char* commandStr){
         if((token = strtok(NULL, " \n")) != NULL){
             //prea multi arg
             cmd.isValid = false;
-            strcpy(cmd.errorMsg, "Too many arguments for 'report'");
+            strcpy(cmd.errorMsg, "Too many arguments for 'report'\n");
             return cmd;
         }else {
             cmd.isValid = true;
@@ -318,7 +332,7 @@ struct Command parse_Command(const char* commandStr){
         if((token = strtok(NULL, " \n")) != NULL){
             //prea multi arg
             cmd.isValid = false;
-            strcpy(cmd.errorMsg, "Too many arguments for 'quit'");
+            strcpy(cmd.errorMsg, "Too many arguments for 'quit'\n");
             return cmd;
         }else {
             cmd.isValid = true;
@@ -326,7 +340,7 @@ struct Command parse_Command(const char* commandStr){
         }
     }
     cmd.isValid = false;
-    strcpy(cmd.errorMsg, "Unknown command");
+    strcpy(cmd.errorMsg, "Unknown command\n");
     return cmd;
 } //end functie parseCommand
 
@@ -399,36 +413,48 @@ bool validate_cycle(const char  *arg){
 }
 
 //preiau/executam comenzile:
-void command_Executor (int fd, struct Command cmd){
+void command_Executor (int fd, struct Command cmd, struct trace_config* client_config){
     switch(cmd.type){
         case CMD_SET_DEST:
-            printf("[server] Execute command SET DEST cu arg %s", cmd.args);
-            send_Message(fd, "Comanda SET DEST inca nu este implementata\n");
+            printf("[server] Execute command SET DEST cu arg %s", cmd.arg);
+            //send_Message(fd, "Comanda SET DEST inca nu este implementata\n");
+            execute_set_dest(fd, cmd.arg, client_config);
+            printf("[server] Command SET DEST executed\n");
             break;
         case CMD_SET_MAXTTL:
-            printf("[server] Execute command SET MAXTTL cu arg %s", cmd.args);
-            send_Message(fd, "Commanda SET MAXTTL inca nu este implementata\n");
+            printf("[server] Execute command SET MAXTTL cu arg %s", cmd.arg);
+            //send_Message(fd, "Commanda SET MAXTTL inca nu este implementata\n");
+            execute_set_maxttl(fd, cmd.arg, client_config);
+            printf("[server] Command SET MAXTTL executed\n");
             break;
         case CMD_SET_INTERVAL:
-            printf("[server] Execute command SET INTERVAL cu arg %s", cmd.args);
-            send_Message(fd, "Commanda SET INTERVAL inca nu este implementata\n");
+            printf("[server] Execute command SET INTERVAL cu arg %s", cmd.arg);
+            //send_Message(fd, "Commanda SET INTERVAL inca nu este implementata\n");
+            execute_set_interval(fd, cmd.arg, client_config);
+            printf("[server] Command SET INTERVAL executed\n");
             break;
         case CMD_SET_TIMEOUT:
-            printf("[server] Execute command SET TIMEOUT cu arg %s", cmd.args);
-            send_Message(fd, "Commanda SET TIMEOUT inca nu este implementata\n");
+            printf("[server] Execute command SET TIMEOUT cu arg %s", cmd.arg);
+            //send_Message(fd, "Commanda SET TIMEOUT inca nu este implementata\n");
+            execute_set_timeout(fd, cmd.arg, client_config); 
+            printf("[server] Command SET TIMEOUT executed\n");
             break;
         case CMD_SET_PROBES:
-            printf("[server] Execute command SET PROBES cu arg %s", cmd.args);
-            send_Message(fd, "Commanda SET PROBES inca nu este implementata\n");
+            printf("[server] Execute command SET PROBES cu arg %s", cmd.arg);
+            //send_Message(fd, "Commanda SET PROBES inca nu este implementata\n");
+            execute_set_probes(fd, cmd.arg, client_config);
+            printf("[server] Command SET PROBES executed\n");
             break;
         case CMD_SET_CYCLE:
-            printf("[server] Execute command SET CYCLE cu arg %s", cmd.args);
-            send_Message(fd, "Commanda SET CYCLE inca nu este implementata\n");
+            printf("[server] Execute command SET CYCLE cu arg %s", cmd.arg);
+            //send_Message(fd, "Commanda SET CYCLE inca nu este implementata\n");
+            execute_set_cycle(fd, cmd.arg, client_config);
+            printf("[server] Command SET CYCLE executed\n");
             break;
         case CMD_START:
             printf("[server] Execute command START");
             //send_Message(fd, "Commanda START inca nu este implementata\n");
-            execute_start(fd);
+            execute_start(fd, client_config);
             printf("[server] Commanda START executata\n");
             break;
         case CMD_STOP:
@@ -447,11 +473,13 @@ void command_Executor (int fd, struct Command cmd){
             printf("[server] Execute command HELP");
             //send_Message(fd, "Commanda HELP inca nu este implementata\n");
             execute_help(fd);
+            printf("[server] Commanda HELP executata\n");
             break;
         case CMD_QUIT:
             printf("[server] Execute commandQUIT");
             //send_Message(fd, "Commanda QUIT inca nu este implementata\n");
             execute_quit(fd);
+            printf("[server] Commanda QUIT executata\n");
             break;
         case CMD_INVALID:
             //aici nu ar trebui sa ajunga
@@ -465,21 +493,56 @@ void command_Executor (int fd, struct Command cmd){
 }
 
 //functii de implementare a comenzilor
-void execute_set_dest(int fd, const char *arg){}
-void execute_set_maxttl(int fd, const char *arg){}
-void execute_set_interval(int fd, const char *arg){}
-void execute_set_timeout(int fd, const char *arg){}
-void execute_set_probes(int fd, const char *arg){}
-void execute_set_cycle(int fd, const char *arg){}
-void execute_start(int fd){
-    if( traceroute(fd, "8.8.8.8", 19, 1000, 500, 1) < 0 ){
+void execute_set_dest(int fd, const char *arg, struct trace_config* client_config){
+    if(strcpy(client_config->dest_ip, arg)){
+        char msg[128];
+        snprintf(msg, sizeof(msg), "Destination IP set to %s\n", client_config->dest_ip);
+        send_Message(fd, msg);
+    }else {
+        send_Message(fd, "Failed to set destination IP\n");
+    }
+}
+void execute_set_maxttl(int fd, const char *arg, struct trace_config* client_config){
+    client_config->max_ttl = atoi(arg);
+    char msg[128];
+    snprintf(msg, sizeof(msg), "Max TTL set to %d\n", client_config->max_ttl);
+    send_Message(fd, msg); 
+}
+void execute_set_interval(int fd, const char *arg, struct trace_config* client_config){
+    client_config->interval_ms = atoi(arg)*1000; ///convert to ms
+    char msg[128];
+    snprintf(msg, sizeof(msg), "Interval set to %d ms\n", client_config->interval_ms);
+    send_Message(fd, msg);
+}
+void execute_set_timeout(int fd, const char *arg, struct trace_config* client_config){
+    client_config->timeout_ms = atoi(arg);
+    char msg[128];
+    snprintf(msg, sizeof(msg), "Timeout set to %d ms\n", client_config->timeout_ms);
+    send_Message(fd, msg);
+}
+void execute_set_probes(int fd, const char *arg, struct trace_config* client_config){
+    client_config->probes_per_ttl = atoi(arg);
+    char msg[128];
+    snprintf(msg, sizeof(msg), "Probes per TTL set to %d \n", client_config->probes_per_ttl);
+    send_Message(fd, msg);
+}
+void execute_set_cycle(int fd, const char *arg, struct trace_config* client_config){
+    client_config->cycle = atoi(arg);
+    char msg[128];
+    snprintf(msg, sizeof(msg), "Cycle number set to %d\n", client_config->cycle);
+    send_Message(fd, msg);
+}
+void execute_start(int fd, struct trace_config* client_config){
+    /*if( traceroute(fd, "8.8.8.8", 19, 1000, 500, 1) < 0 ){
         send_Message(fd, "Traceroute failed due to an error.\n");
         return;
-    }
+    }*/
+    //afisez datele structurii:
+    afisare_date_structura_config(fd, client_config);
 }
 void execute_stop(int fd){}
 void execute_reset(int fd){}
-void execute_report(int fd){}
+void execute_report(int fd, struct trace_config* client_config){}
 void execute_help(int fd){
     FILE *help_file = fopen("help.txt", "r");
     if(help_file == NULL){
@@ -498,5 +561,17 @@ void execute_help(int fd){
 void execute_quit(int fd){
     printf("[server] Quit execute: The client with descriptor: %d requests disconnection\n", fd);
     send_Message(fd, "Quit Accepted\n");
-    //close(fd);
+    close(fd);
+}
+
+void afisare_date_structura_config(int fd, struct trace_config* client_config){
+    //afisez datele structurii:
+    send_Message(fd, client_config->dest_ip);
+    send_Message(fd, "\n");
+    char buff[64];
+    snprintf(buff, sizeof(buff), "%d\n", client_config->max_ttl);         send_Message(fd, buff);
+    snprintf(buff, sizeof(buff), "%d\n", client_config->interval_ms);     send_Message(fd, buff);
+    snprintf(buff, sizeof(buff), "%d\n", client_config->probes_per_ttl);  send_Message(fd, buff);
+    snprintf(buff, sizeof(buff), "%d\n", client_config->timeout_ms);      send_Message(fd, buff);
+    snprintf(buff, sizeof(buff), "%d\n", client_config->cycle);           send_Message(fd, buff);
 }

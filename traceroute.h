@@ -16,15 +16,19 @@
 #include <stdbool.h>
 #include <errno.h>
 #include <signal.h>
+#include <ctype.h>
 
 #define PID_MASK 0xFFFF
 #define PACKET_SIZE (sizeof(struct icmphdr) + sizeof(struct timeval))
 
-struct trace{
-    char ip[64];
-    int ttl;
-    double rtt;
-    bool success;
+//traceroute configuration structure
+struct trace_config{
+    char dest_ip[16];
+    int max_ttl;
+    int timeout_ms;
+    int interval_ms;
+    int probes_per_ttl;
+    int cycle;
 };
 
 //Checksum function for ICMP packets
