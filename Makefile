@@ -15,7 +15,11 @@ $(EXEC_CLIENT):
 $(EXEC_SERVER):
 	$(CC) $(CFLAGS) $(SERVER_SRC) -o $(EXEC_SERVER)
 
-rebuild: clean all
-
 clean:
 	rm -f $(EXEC_CLIENT) $(EXEC_SERVER)
+
+rebuild: clean all
+
+debug:
+	$(CC) -DDEBUG $(CFLAGS) $(CLIENT_SRC) -o $(EXEC_CLIENT)
+	$(CC) -DDEBUG $(CFLAGS) $(SERVER_SRC) -o $(EXEC_SERVER)

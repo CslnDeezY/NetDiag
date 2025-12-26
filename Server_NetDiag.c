@@ -136,7 +136,16 @@ int main(int argc, char* argv[]){
                     //parsam comanda
                     struct Command cmd = parse_Command(buffer);
                     if(cmd.isValid){
+                        //daca comanda este quit trebuie sa actualizam mult de descriptori actfds
+                        bool isQuit = (cmd.type == CMD_QUIT);
+
                         command_Executor(fd,cmd, &client_configs[fd]);
+
+                        if(isQuit){
+                            printf("Debug: [serer] stergem descriptorul %d din multimea de descriptori activi\n", fd);
+                            FD_CLR(fd, &actfds);
+                            close(fd);
+                        }
                     }else {
                         printf("[server] Invalid command\n");
                         if(send_Message(fd,cmd.errorMsg) < 0){

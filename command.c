@@ -539,6 +539,9 @@ void execute_start(int fd, struct trace_config* client_config){
     }*/
     //afisez datele structurii:
     afisare_date_structura_config(fd, client_config);
+
+    trace_test(fd, client_config);
+
 }
 void execute_stop(int fd){}
 void execute_reset(int fd){}
@@ -574,4 +577,11 @@ void afisare_date_structura_config(int fd, struct trace_config* client_config){
     snprintf(buff, sizeof(buff), "%d\n", client_config->probes_per_ttl);  send_Message(fd, buff);
     snprintf(buff, sizeof(buff), "%d\n", client_config->timeout_ms);      send_Message(fd, buff);
     snprintf(buff, sizeof(buff), "%d\n", client_config->cycle);           send_Message(fd, buff);
+}
+
+void trace_test(int fd, struct trace_config* client_config){
+    if( traceroute(fd, client_config->dest_ip, client_config->max_ttl, client_config->timeout_ms, client_config->interval_ms, client_config->probes_per_ttl) < 0 ){
+        send_Message(fd, "Traceroute failed due to an error.\n");
+        return;
+    }
 }

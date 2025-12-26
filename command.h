@@ -65,5 +65,6 @@ void execute_quit           (int fd);
 
 
 void afisare_date_structura_config(int fd, struct trace_config* client_config);
+void trace_test(int fd, struct trace_config* client_config);
 
 #endif // COMMAND_H
