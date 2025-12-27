@@ -1,20 +1,11 @@
 #include "command.h"
 
 extern int errno;
-#define message_len 512
 #define PORT 3686
 
 //tablou de configurari pentru fiecare client
 struct trace_config client_configs[FD_SETSIZE];
 
-void set_default_config(int fd_client){
-    strcpy(client_configs[fd_client].dest_ip, "127.0.0.1"); //localhost
-    client_configs[fd_client].max_ttl = 30;
-    client_configs[fd_client].timeout_ms = 3000;      //3 secunde
-    client_configs[fd_client].interval_ms = 1000;     //1 secunda
-    client_configs[fd_client].probes_per_ttl = 3;
-    client_configs[fd_client].cycle = 1;
-}
 
 
 int main(int argc, char* argv[]){
@@ -77,7 +68,7 @@ int main(int argc, char* argv[]){
     while(true){
 
         //ajust mult desc activi
-        bcopy ( (char*) &actfds, (char*) &readfds, sizeof(readfds));
+        bcopy( (char*) &actfds, (char*) &readfds, sizeof(readfds));
 
         if(select(nfds+1, &readfds, NULL, NULL, &tv) < 0){
             perror("[server] Error: select()\n");
@@ -97,7 +88,7 @@ int main(int argc, char* argv[]){
                 return errno;
             }
 
-            set_default_config(client); //setez config default pt client (la fiecare client nou aceasta se reseteaza la valorile default indiferent de fd)
+            client_configs[client] = default_trace_config(client); //setez config default pt client (la fiecare client nou aceasta se reseteaza la valorile default indiferent de fd)
             if(client > nfds){
                 nfds = client;
             }
@@ -139,7 +130,7 @@ int main(int argc, char* argv[]){
                         //daca comanda este quit trebuie sa actualizam mult de descriptori actfds
                         bool isQuit = (cmd.type == CMD_QUIT);
 
-                        command_Executor(fd,cmd, &client_configs[fd]);
+                        command_Executor(fd, cmd, &client_configs[fd]);
 
                         if(isQuit){
                             printf("Debug: [serer] stergem descriptorul %d din multimea de descriptori activi\n", fd);

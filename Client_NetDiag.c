@@ -6,8 +6,7 @@
 #include <sys/types.h>
 #include <sys/select.h>
 #include <sys/socket.h>
-
-
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -16,9 +15,11 @@
 extern int errno;
 #define message_len 512
 int port;
+volatile sig_atomic_t stop = 0;
 
 int recive_Message(int fd, char* buffer);
 int send_Message(int sd, char* buffer);
+void handler_sigint(int sig);
 
 int main (int argc, char *argv[])
 {
@@ -37,7 +38,17 @@ int main (int argc, char *argv[])
         perror ("[client] Error socket())\n");
         return errno;
     }
-
+    // Instalam handler pentru SIGINT cu sigaction si SA_RESTART
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = handler_sigint;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_RESTART;
+    if (sigaction(SIGINT, &sa, NULL) == -1) {
+        perror("[client] Error sigaction()\n");
+        close(sd);
+        return errno;
+    }
 
     server.sin_family = AF_INET;
     server.sin_addr.s_addr = inet_addr(argv[1]);
@@ -56,8 +67,20 @@ int main (int argc, char *argv[])
 
     while(true){
 
-// varianta veche de functionare nu mai este potrivita
-///acum verifica constant daca vrem sa trimitem o comanda sau sa primim un raspuns
+        if(stop){
+            printf("[client] Inchid conexiunea...\n");
+            if(send(sd, "quit\n", strlen("quit\n"), 0) <= 0){
+                perror("[client]Eroare la send\n");
+                errno;
+            }
+            recive_Message(sd, msg);
+            if(strcmp(msg, "Quit Accepted\n") == 0){
+                printf("[client] Conexiunea la server s-a inchis.\n");
+            } else printf("[client] Raspuns neasteptat de la server: %s mai stau un pic\n", msg);
+            break;
+        }
+
+        //verific constant daca trimit sau primesc date
         FD_ZERO(&rfds);
         FD_SET(sd, &rfds);
         FD_SET(STDIN_FILENO, &rfds);
@@ -68,6 +91,10 @@ int main (int argc, char *argv[])
             maxfd = STDIN_FILENO;
         
         if (select(maxfd + 1, &rfds, NULL, NULL, NULL) < 0) {
+            if (errno == EINTR) {
+                // intrerupt de semnal; bucla va verifica 'stop' la inceput
+                continue;
+            }
             perror("[client] Error select()");
             return errno;
         }
@@ -118,27 +145,41 @@ int main (int argc, char *argv[])
     close (sd);
 }
 
-
 int recive_Message(int fd, char* buffer){
-    int bytes;
-    bzero(buffer, sizeof(&buffer));
+    int bytes = 0;
+    bzero(buffer, message_len);
 
-    //citim lungimea mesajului
-    if(read(fd, &bytes, sizeof(bytes)) < 0){
+    // citim lungimea mesajului
+    int n = read(fd, &bytes, sizeof(bytes));
+    if(n < 0){
         perror("[client] Error read length from server\n");
         return -1;
+    } else if(n == 0){
+        // conexiunea s-a inchis
+        return 0;
     }
 
-    //citim mesajul
+    // citim mesajul
     if(bytes > 0){
-        if(read(fd, buffer, bytes) < 0){
+        n = read(fd, buffer, bytes);
+        if(n < 0){
             perror("[client] Error read() from server\n");
             return -1;
+        } else if(n == 0){
+            // conexiunea s-a inchis
+            return 0;
+        }
+        if(n < bytes) {
+            buffer[n] = '\0';
+        } else {
+            buffer[bytes] = '\0';
         }
     }
-    printf("%s", buffer);
 
-    //printf ("[client]Am citit: %d bytes: %s\n", bytes, buffer);
+    printf("%s", buffer);
     return bytes;
 }
 
+void handler_sigint(int sig){
+    stop = 1;
+}

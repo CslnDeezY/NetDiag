@@ -1,6 +1,6 @@
 #include "command.h"
 #include "traceroute.h"
-#include <stdio.h>
+#include <pthread.h>
 
 //functiile de trimitere si receptare de mesaje
 int send_Message( int fd, char* message ){
@@ -416,69 +416,75 @@ bool validate_cycle(const char  *arg){
 void command_Executor (int fd, struct Command cmd, struct trace_config* client_config){
     switch(cmd.type){
         case CMD_SET_DEST:
-            printf("[server] Execute command SET DEST cu arg %s", cmd.arg);
+            printf("[server] Execute command SET DEST cu arg %s\n", cmd.arg);
             //send_Message(fd, "Comanda SET DEST inca nu este implementata\n");
             execute_set_dest(fd, cmd.arg, client_config);
             printf("[server] Command SET DEST executed\n");
             break;
         case CMD_SET_MAXTTL:
-            printf("[server] Execute command SET MAXTTL cu arg %s", cmd.arg);
+            printf("[server] Execute command SET MAXTTL cu arg %s\n", cmd.arg);
             //send_Message(fd, "Commanda SET MAXTTL inca nu este implementata\n");
             execute_set_maxttl(fd, cmd.arg, client_config);
             printf("[server] Command SET MAXTTL executed\n");
             break;
         case CMD_SET_INTERVAL:
-            printf("[server] Execute command SET INTERVAL cu arg %s", cmd.arg);
+            printf("[server] Execute command SET INTERVAL cu arg %s\n", cmd.arg);
             //send_Message(fd, "Commanda SET INTERVAL inca nu este implementata\n");
             execute_set_interval(fd, cmd.arg, client_config);
             printf("[server] Command SET INTERVAL executed\n");
             break;
         case CMD_SET_TIMEOUT:
-            printf("[server] Execute command SET TIMEOUT cu arg %s", cmd.arg);
+            printf("[server] Execute command SET TIMEOUT cu arg %s\n", cmd.arg);
             //send_Message(fd, "Commanda SET TIMEOUT inca nu este implementata\n");
             execute_set_timeout(fd, cmd.arg, client_config); 
             printf("[server] Command SET TIMEOUT executed\n");
             break;
         case CMD_SET_PROBES:
-            printf("[server] Execute command SET PROBES cu arg %s", cmd.arg);
+            printf("[server] Execute command SET PROBES cu arg %s\n", cmd.arg);
             //send_Message(fd, "Commanda SET PROBES inca nu este implementata\n");
             execute_set_probes(fd, cmd.arg, client_config);
             printf("[server] Command SET PROBES executed\n");
             break;
         case CMD_SET_CYCLE:
-            printf("[server] Execute command SET CYCLE cu arg %s", cmd.arg);
+            printf("[server] Execute command SET CYCLE cu arg %s\n", cmd.arg);
             //send_Message(fd, "Commanda SET CYCLE inca nu este implementata\n");
             execute_set_cycle(fd, cmd.arg, client_config);
             printf("[server] Command SET CYCLE executed\n");
             break;
         case CMD_START:
-            printf("[server] Execute command START");
+            printf("[server] Execute command START\n");
             //send_Message(fd, "Commanda START inca nu este implementata\n");
             execute_start(fd, client_config);
             printf("[server] Commanda START executata\n");
             break;
         case CMD_STOP:
-            printf("[server] Execute command STOP");
-            send_Message(fd, "Commanda STOP inca nu este implementata\n");
+            printf("[server] Execute command STOP\n");
+            //send_Message(fd, "Commanda STOP inca nu este implementata\n");
+            execute_stop(fd, client_config);
+            printf("[server] Commanda STOP executata\n");
             break;
         case CMD_RESET:
-            printf("[server] Execute command RESET");
-            send_Message(fd, "Commanda RESET inca nu este implementata\n");
+            printf("[server] Execute command RESET\n");
+            //send_Message(fd, "Commanda RESET inca nu este implementata\n");
+            execute_reset(fd, client_config);
+            printf("[server] Commanda RESET executata\n");
             break;
         case CMD_REPORT:
-            printf("[server] Execute command REPORT");
-            send_Message(fd, "Commanda REPORT inca nu este implementata\n");
+            printf("[server] Execute command REPORT\n");
+            //send_Message(fd, "Commanda REPORT inca nu este implementata\n");
+            execute_report(fd, client_config);
+            printf("[server] Commanda REPORT executata\n");
             break;
         case CMD_HELP:
-            printf("[server] Execute command HELP");
+            printf("[server] Execute command HELP\n");
             //send_Message(fd, "Commanda HELP inca nu este implementata\n");
             execute_help(fd);
             printf("[server] Commanda HELP executata\n");
             break;
         case CMD_QUIT:
-            printf("[server] Execute commandQUIT");
+            printf("[server] Execute command QUIT\n");
             //send_Message(fd, "Commanda QUIT inca nu este implementata\n");
-            execute_quit(fd);
+            execute_quit(fd, client_config);
             printf("[server] Commanda QUIT executata\n");
             break;
         case CMD_INVALID:
@@ -533,19 +539,86 @@ void execute_set_cycle(int fd, const char *arg, struct trace_config* client_conf
     send_Message(fd, msg);
 }
 void execute_start(int fd, struct trace_config* client_config){
-    /*if( traceroute(fd, "8.8.8.8", 19, 1000, 500, 1) < 0 ){
-        send_Message(fd, "Traceroute failed due to an error.\n");
-        return;
-    }*/
+/*
+    //for testare:
     //afisez datele structurii:
     afisare_date_structura_config(fd, client_config);
-
     trace_test(fd, client_config);
+    */
+    pthread_mutex_lock(&client_config->mutex);
+
+    if(client_config->is_running){
+        send_Message(fd, "Traceroute is already running\n");
+    }else {
+        client_config->is_running = true;
+        client_config->want_stop = false;
+        client_config->want_report = false;  //vom rula in continuu
+        
+        if(!client_config->thread_exists){
+            //daca inca nu am apelat niciodata comanda start atunci cream threadul si il marcam ca exista
+            pthread_create(&client_config->thread_id, NULL, &traceroute_thread, (void*)client_config);
+            client_config->thread_exists = true;
+        }
+        pthread_cond_signal(&client_config->cond);  //scoatem din starea de idle
+        send_Message(fd, "Starting traceroute...\n");
+    }
+
+    pthread_mutex_unlock(&client_config->mutex);
 
 }
-void execute_stop(int fd){}
-void execute_reset(int fd){}
-void execute_report(int fd, struct trace_config* client_config){}
+void execute_stop(int fd, struct trace_config* client_config){
+    //aici e unpunct critic
+    pthread_mutex_lock(&client_config->mutex);
+
+    if(!client_config->is_running){
+        send_Message(fd, "Traceroute is not running\n");
+    }else {
+        client_config->want_stop = true;
+        //threadul singut se va opri
+
+        send_Message(fd, "Stopping traceroute...\n");
+    }
+
+    pthread_mutex_unlock(&client_config->mutex);
+}
+void execute_reset(int fd, struct trace_config* client_config){
+       //aici e unpunct critic
+    pthread_mutex_lock(&client_config->mutex);
+
+    if(!client_config->is_running){
+        send_Message(fd, "Traceroute is not running\n");
+    }else {
+        client_config->want_reset = true;
+        send_Message(fd, "Resetting traceroute...\n");
+    }
+
+    pthread_mutex_unlock(&client_config->mutex);
+}
+
+void execute_report(int fd, struct trace_config* client_config){
+    
+    //raportul va rula traceroutul ce un numar anumit de cicluri si va afisa pe ecran raspunsurile finale
+    pthread_mutex_lock(&client_config->mutex);
+
+    if(client_config->is_running){
+        send_Message(fd, "Traceroute is already running\n");
+    }else {
+        client_config->is_running = true;
+        client_config->want_stop = false;
+        client_config->want_report = true;  //vom rula doar pentru un numar de cicluri
+        
+        if(!client_config->thread_exists){
+            //daca inca nu am apelat niciodata comanda start sau report atunci cream threadul si il marcam ca exista
+            pthread_create(&client_config->thread_id, NULL, &traceroute_thread, (void*)client_config);
+            client_config->thread_exists = true;
+        }
+        pthread_cond_signal(&client_config->cond);  //scoatem din starea de idle
+        send_Message(fd, "Starting traceroute...\n");
+    }
+
+    pthread_mutex_unlock(&client_config->mutex);
+
+}
 void execute_help(int fd){
     FILE *help_file = fopen("help.txt", "r");
     if(help_file == NULL){
@@ -561,11 +634,37 @@ void execute_help(int fd){
     }
     fclose(help_file);
 }
-void execute_quit(int fd){
+void execute_quit(int fd, struct trace_config* client_config){
     printf("[server] Quit execute: The client with descriptor: %d requests disconnection\n", fd);
+
+    pthread_mutex_lock(&client_config->mutex);
+    client_config->want_stop = true;
+    client_config->want_exit = true;
+    client_config->is_running = true;   //scoatem threadul din asteptare pentru a se curatoi si inchide corect
+
+    //trezil threadul
+    pthread_cond_signal(&client_config->cond);  //scoatem din starea de idle 
+
+    pthread_mutex_unlock(&client_config->mutex);
+
+    if(client_config->thread_exists){
+        //asteptam terminarea threadului
+        if(pthread_join(client_config->thread_id, NULL) != 0){
+            perror("[server] Quit execute: Error joining traceroute thread\n");
+        }
+        client_config->thread_exists = false;
+        printf("[server] Quit execute: Thread joined and cleaned up\n");
+    }
+
+    //distrugem mecanismeel de sincronizare
+    pthread_mutex_destroy(&client_config->mutex);
+    pthread_cond_destroy(&client_config->cond);
+
     send_Message(fd, "Quit Accepted\n");
     close(fd);
 }
+
+//functii de testare
 
 void afisare_date_structura_config(int fd, struct trace_config* client_config){
     //afisez datele structurii:

@@ -57,11 +57,11 @@ void execute_set_timeout    (int fd, const char *arg, struct trace_config* clien
 void execute_set_probes     (int fd, const char *arg, struct trace_config* client_config);
 void execute_set_cycle      (int fd, const char *arg, struct trace_config* client_config);
 void execute_start          (int fd, struct trace_config* client_config);
-void execute_stop           (int fd);
-void execute_reset          (int fd);
+void execute_stop           (int fd, struct trace_config* client_config);
+void execute_reset          (int fd, struct trace_config* client_config);
 void execute_report         (int fd, struct trace_config* client_config);
+void execute_quit           (int fd, struct trace_config* client_config);  
 void execute_help           (int fd);
-void execute_quit           (int fd);
 
 
 void afisare_date_structura_config(int fd, struct trace_config* client_config);
