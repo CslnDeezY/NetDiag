@@ -10,6 +10,9 @@ struct trace_config client_configs[FD_SETSIZE];
 
 int main(int argc, char* argv[]){
 
+    FILE *f = fopen("traceroute_debug.log", "w");
+    if(f) fclose(f);
+
     struct sockaddr_in server;	    //struct server - client
     struct sockaddr_in from;
     fd_set readfds;                 //multimea descriptorilor de citire
@@ -20,8 +23,6 @@ int main(int argc, char* argv[]){
 
     int nfds;			            //nr maxim
     int len;			            //lungimea structurii sockaddr_in
-
-    signal(SIGPIPE, SIG_IGN);
 
     //creez socket
     if((sd = socket(AF_INET, SOCK_STREAM, 0)) == -1){

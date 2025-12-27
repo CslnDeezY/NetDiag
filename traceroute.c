@@ -48,7 +48,7 @@ unsigned short check_Sum(void *b, int len){
     return result;
 }
 //functia triite un pachet ICMP echo request cu TTL
-int send_Probe(int sd, const char *dest_ip, int ttl, int seq){
+int send_Probe(int sd, const char *dest_ip, int ttl, int seq, int client_id){
     struct sockaddr_in to_addr;
     memset(&to_addr, 0, sizeof(to_addr));
     //set destination address
@@ -73,7 +73,8 @@ int send_Probe(int sd, const char *dest_ip, int ttl, int seq){
     //populez campurile 
     icmp->type = ICMP_ECHO;
     icmp->code = 0;
-    icmp->un.echo.id = htons(getpid() & PID_MASK); //identificator unic pentru proces
+    //folosim client_id (fd-ul socketului) in loc de getpid()
+    icmp->un.echo.id = htons(client_id & 0xFFFF); //identificator unic pentru proces
     icmp->un.echo.sequence = htons(seq);            //nr pachetului in secventa
 
     //calculez checksum-ul
@@ -94,11 +95,18 @@ int send_Probe(int sd, const char *dest_ip, int ttl, int seq){
 
 
 //functia asteapta si proceseaza raspunsurile ICMP
-int recive_Reply(int sd, int pid, int seq, char *router_ip, int timeout_ms){
+int recive_Reply(int sd, int client_id, int seq, char *router_ip, int timeout_ms){
     fd_set read_fds;
     struct timeval tm_out;
+    struct timeval start_time, current_time;//calculam timpul de asteptare ca sa nu ne blocam undeva
+    gettimeofday(&start_time, NULL);
     
     while(true){
+        gettimeofday(&current_time, NULL);
+        long elapsed = (current_time.tv_sec - start_time.tv_sec) * 1000 + (current_time.tv_usec - start_time.tv_usec) / 1000;
+        if (elapsed >= timeout_ms) 
+            return -2; // Timeout real
+
         //configurez timeout pentru fiecare incercare
         tm_out.tv_sec  = timeout_ms / 1000;
         tm_out.tv_usec = (timeout_ms % 1000) * 1000;
@@ -122,8 +130,7 @@ int recive_Reply(int sd, int pid, int seq, char *router_ip, int timeout_ms){
         socklen_t from_sk_len = sizeof(from_addr);
 
         //primesc pachetul in stare cruda
-        int bytes = recvfrom(sd, buff, sizeof(buff), 0,
-                             (struct sockaddr*)&from_addr, &from_sk_len);
+        int bytes = recvfrom(sd, buff, sizeof(buff), 0, (struct sockaddr*)&from_addr, &from_sk_len);
         if(bytes < 0){
             perror("[server][trace]: Error: recvfrom()\n");
             return -1;
@@ -141,22 +148,17 @@ int recive_Reply(int sd, int pid, int seq, char *router_ip, int timeout_ms){
         int received_id = 0;
         int received_seq = 0;
 
-        //printf("Debug: [server][trace]: Received ICMP type=%d, code=%d from %s\n", 
-        //       icmp_hdr->type, icmp_hdr->code, inet_ntoa(from_addr.sin_addr));
+        //printf("Debug: [server][trace]: Received ICMP type=%d, code=%d from %s\n", icmp_hdr->type, icmp_hdr->code, inet_ntoa(from_addr.sin_addr));
 
         //procesare:
         if (icmp_hdr->type == ICMP_TIME_EXCEEDED || icmp_hdr->type == ICMP_DEST_UNREACH) {
-            if (bytes < ip_header_len + (int)sizeof(struct icmphdr) +
-                        (int)sizeof(struct iphdr) + 8) 
+            if (bytes < ip_header_len + (int)sizeof(struct icmphdr) + (int)sizeof(struct iphdr) + 8) 
                 continue;
 
-            struct iphdr *org_ip_hdr =
-                (struct iphdr*)(buff + ip_header_len + sizeof(struct icmphdr));
+            struct iphdr *org_ip_hdr = (struct iphdr*)(buff + ip_header_len + sizeof(struct icmphdr));
             int org_ip_hdr_len = org_ip_hdr->ihl * 4;
 
-            struct icmphdr *org_icmp_hdr =
-                (struct icmphdr*)(buff + ip_header_len +
-                                  sizeof(struct icmphdr) + org_ip_hdr_len);
+            struct icmphdr *org_icmp_hdr = (struct icmphdr*)(buff + ip_header_len + sizeof(struct icmphdr) + org_ip_hdr_len);
 
             received_id  = ntohs(org_icmp_hdr->un.echo.id);
             received_seq = ntohs(org_icmp_hdr->un.echo.sequence);
@@ -166,125 +168,26 @@ int recive_Reply(int sd, int pid, int seq, char *router_ip, int timeout_ms){
             received_id  = ntohs(icmp_hdr->un.echo.id);
             received_seq = ntohs(icmp_hdr->un.echo.sequence);
         } else {
+            //pachetul este pentru alt client
+            // logam faptul ca am "interceptat" pachetul altcuiva
+            log_packet_mismatch(client_id, received_id, received_seq, inet_ntoa(from_addr.sin_addr));
             continue; // ignora alte tipuri
         }
 
         //verifica daca pachetul e al nostru
-        if (received_id == (pid & PID_MASK) && received_seq == seq) {
+        if (received_id == (client_id & 0xFFFF) && received_seq == seq) {
             const char *ip_str = inet_ntoa(from_addr.sin_addr);
             strncpy(router_ip, ip_str, INET_ADDRSTRLEN - 1);
             router_ip[INET_ADDRSTRLEN - 1] = '\0';
-            //printf("Debug: [server][trace]: MATCH! Reply de la %s, type=%d\n",
-            //       router_ip, icmp_hdr->type);
+            //printf("Debug: [server][trace]: MATCH! Reply de la %s, type=%d\n", router_ip, icmp_hdr->type);
             return icmp_hdr->type;
         } else {
-            //printf("Debug: [server][trace]: Mismatch - expected seq=%d, got seq=%d\n",
-            //       seq, received_seq);
+            //printf("Debug: [server][trace]: Mismatch - expected seq=%d, got seq=%d\n", seq, received_seq);
             continue;
         }
     }
     
     return -1;
-}
-
-//functia principala de traceroute
-//trimite probe ICMP cu TTL crescator si asteapta raspunsuri
-//pana la atingerea destinatiei sau max_ttl
-//returneaza 0 la succes, -1 la eroare
-//fd este socketul client-ului pentru a trimite rezultatele
-
-int traceroute(int fd, const char *dest_ip, int max_ttl, int timeout_ms, int interval_ms, int probes_per_ttl){
-    int sd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP); //creez socket raw pentru ICMP
-    if(sd < 0){
-        perror("[server][trace]: Error: socket()\n");
-        return -1;
-    }
-
-    struct timeval start, end;
-
-    //creez structura de date pentru fiecare hop
-    struct trace_hop_data hops_data[max_ttl]; //max hop-uri
-    memset(hops_data, 0, sizeof(hops_data));
-    
-    //char msg[512];
-    //snprintf(msg, sizeof(msg), "Starting traceroute to %s\n", dest_ip);
-    //send_Message(fd, msg);
-
-    send_Message(fd, "\033[2J\033[H");
-
-    int pid = getpid() & PID_MASK;
-    int seq = 0;
-    bool reached = false;
-
-    for(int ttl = 1; ttl <= max_ttl && !reached; ttl++){
-        
-        struct trace_hop_data *hop = &hops_data[ttl - 1];
-
-        for(int probe = 0; probe < probes_per_ttl; probe++){
-
-            long rtt_ms = -1;   //round-trip time in milisecunde
-            char router_ip[64];
-            strncpy(router_ip, "*", sizeof(router_ip));
-            router_ip[sizeof(router_ip) - 1] = '\0';
-            seq++;
-
-            hop->send++;
-
-            if(send_Probe(sd, dest_ip, ttl, seq) < 0){
-                send_Message(fd, "[traceroute] Error: send probe\n");
-                continue;
-            }
-
-            gettimeofday(&start, NULL);
-
-            int reply = recive_Reply(sd, pid, seq, router_ip, timeout_ms);
-
-            gettimeofday(&end, NULL);
-
-            if(reply == -2){
-                //timeout
-                printf("[server][trace]: Timeout waiting for reply\n");
-             }else if(reply < 0){
-                //eroare
-                printf("[server][trace] Error receiving reply\n");
-             }else{
-                //am primit raspuns
-                //memset(msg, 0, sizeof(msg));
-                hop->received++;
-                
-                //salvez ip-ul router-ului
-                if(strcmp(router_ip, "*") != 0){
-                    strcpy(hop->router_ip, router_ip);
-                }
-
-                //calculez RTT
-                rtt_ms = (end.tv_sec - start.tv_sec) * 1000 + (end.tv_usec / 1000 - start.tv_usec / 1000);
-
-                //salvez statistica
-                hop->last_rtt = rtt_ms;
-                hop->sum_rtt += rtt_ms;
-
-                if(reply == ICMP_ECHOREPLY){
-                    reached = true; //am ajuns la destinatie
-                    hop->reached = true;
-                }
-            }
-            /*
-            //afisez tabelul de trace actualizat
-            if( print_trace_table(fd, hops_data, max_ttl) < 0 ){
-                printf("[server][trace]: Error client deconectat\n");
-                close(sd);
-                return -1;
-            }
-            */
-
-            usleep(interval_ms * 1000); //interval intre probes
-        }
-    }
-
-    close(sd);
-    //send_Message(fd, "Traceroute completed.\n");
-    return 0;
 }
 
 void* traceroute_thread(void *arg){
@@ -332,6 +235,11 @@ int trace_run(struct trace_config* client_config){
         //generam raportul
         traceroute_raport(client_config);
     }
+    else {
+        //rulam traceroute continuu
+        traceroute(client_config);
+        send_Message(client_config->client_fd, "\033[?25h\033[?1049l"); //afisam cursorul si iesim din modul ecran alternativ
+    }
     return  0;
 }
 
@@ -351,8 +259,7 @@ int traceroute_raport(struct trace_config* client_config){
     struct trace_hop_data hops_data[client_config->max_ttl];
     memset(hops_data, 0, sizeof(hops_data));
 
-    int seq = 0;
-    int pid = getpid() & PID_MASK;
+    int seq = 0;;
 
     for(int c = 1; c <= client_config->cycle; c++){
         bool reached = false;
@@ -386,7 +293,7 @@ int traceroute_raport(struct trace_config* client_config){
                 seq++;
                 hop->send++;
 
-                if(send_Probe(sd, client_config->dest_ip, ttl, seq) < 0){
+                if(send_Probe(sd, client_config->dest_ip, ttl, seq,client_config->client_fd) < 0){
                     //send_Message(client_config->client_fd, "[traceroute] Error: send probe\n");
                     printf("[server][trace] Error send_Probe\n");
                     continue;
@@ -394,7 +301,7 @@ int traceroute_raport(struct trace_config* client_config){
 
                 gettimeofday(&start, NULL); //timpul la care am trimis pchetul
 
-                int reply = recive_Reply(sd, pid, seq, router_ip, client_config->timeout_ms);
+                int reply = recive_Reply(sd, client_config->client_fd, seq, router_ip, client_config->timeout_ms);
 
                 gettimeofday(&end, NULL); //timpul la care am primit raspunsul
 
@@ -427,7 +334,7 @@ int traceroute_raport(struct trace_config* client_config){
                     }
                 }
 
-                usleep(10 * 1000); //interval intre probe 10 ms
+                usleep(client_config->interval_ms * 1000); //interval intre probe 10 ms
             }//probe loop
         }//ttl loop
     }//cycle loop
@@ -438,7 +345,6 @@ int traceroute_raport(struct trace_config* client_config){
     if(send_raport(client_config->client_fd, hops_data, client_config->max_ttl) < 0) {
         printf("[server][trace_raport]: Error sending report to client\n");
     }
-
     return 0;
 }
 
@@ -466,84 +372,200 @@ int send_raport(int fd, struct trace_hop_data* hops_data, int max_ttl){
         }
 
         //determinam statusul si ii atribuim cate o culoare:
-        char *status_str;
-        char *status_color;
+        char *statut_str;
+        char *statut_color;
         if(hop.received == 0){
-            status_str = "Lost";
-            status_color = CLR_ERR; //rosu
-
+            statut_str = "Lost";
+            statut_color = CLR_ERR; //rosu
         }else if(hop.received < hop.send){
-            status_str = "Unstable";
-            status_color = CLR_UNSTBL; //galben
+            statut_str = "Unstable";
+            statut_color = CLR_UNSTBL; //galben
         }else {
-            status_str = "Good";
-            status_color = CLR_STBL; //verde
+            statut_str = "Good";
+            statut_color = CLR_STBL; //verde
         }
         snprintf(buffer, sizeof(buffer), " %-3d | %-17s | %8d | %4d | %7.2f | %s%-8s %s\n", 
-                    i + 1, hop.router_ip, hop.last_rtt, hop.send, avg_rtt, status_color,status_str, CLR_RESET);
+                    i + 1, hop.router_ip, hop.last_rtt, hop.send, avg_rtt, statut_color,statut_str, CLR_RESET);
         send_Message(fd, buffer);
         memset(buffer, 0, sizeof(buffer));
         
     }
     strcat(buffer, "\033[J"); //sterg tot ce e sub tabel ca sa fiu sigur
     return send_Message(fd, buffer);
-
-    return 0;
 }
 
 
-
-int print_trace(int fd, struct trace_hop_data* hops_data, int max_ttl){
-    //cream un buffer mare pentru intreg tabelul si il triitem la fiecare modificare ca sa arate totul frumos
-    char big_buffer[message_len];
-    memset(big_buffer, 0, sizeof(big_buffer));
-
-    //ne intoarcem in stanga sus cu cursorul
-    strcat(big_buffer, "\033[H");
-    
-    char mini_buffer[message_len];
-    memset(mini_buffer, 0, sizeof(mini_buffer));
-    //initializam antetul tabelului
-    strcat(big_buffer, " nr. |      Host IP      | Last(ms) | Sent | Avg(ms) |  Status  \n");
-    strcat(big_buffer, "-----|-------------------|----------|------|---------|----------\n");
-
-    
-    for(int i = 0; i < max_ttl; i++){
-        struct trace_hop_data hop = hops_data[i];
-
-        if(hop.send == 0){
-            //nu am trimis probe la acest hop inca
-            continue;
-        }
-
-        float avg_rtt = 0;   //daca nu am primit niciun raspuns este 0
-        if(hop.received > 0){
-            avg_rtt = hop.sum_rtt / hop.received;
-        }
-
-        //determinam statusul si ii atribuim cate o culoare:
-        char *status_str;
-        char *status_color;
-        if(hop.received == 0){
-            status_str = "Lost";
-            status_color = CLR_ERR; //rosu
-
-        }else if(hop.received < hop.send){
-            status_str = "Unstable";
-            status_color = CLR_UNSTBL; //galben
-        }else {
-            status_str = "Good";
-            status_color = CLR_STBL; //verde
-        }
-
-
-
-        snprintf(mini_buffer, sizeof(mini_buffer), " %-3d | %-17s | %8d | %4d | %7.2f | %s%-8s %s\n", 
-                    i + 1, hop.router_ip, hop.last_rtt, hop.send, avg_rtt, status_color,status_str, CLR_RESET);
-        strcat(big_buffer, mini_buffer);
-        memset(mini_buffer, 0, sizeof(mini_buffer));
-        
+//functia principala de traceroute
+//trimite probe ICMP cu TTL crescator si asteapta raspunsuri
+//pana la atingerea destinatiei sau max_ttl
+//returneaza 0 la succes, -1 la eroare
+//fd este socketul client-ului pentru a trimite rezultatele
+int traceroute(struct trace_config* client_config){
+    int sd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP); //creez socket raw pentru ICMP
+    if(sd < 0){
+        perror("[server][trace]: Error: socket()\n");
+        return -1;
     }
-    strcat(big_buffer, "\033[J"); //ster tot ce e sub tabel ca sa fiu sigur
-    return send_Message(fd, big_buffer);
+    struct timeval start, end;
+
+    //creez structura de date pentru fiecare hop
+    struct trace_hop_data hops_data[client_config->max_ttl]; //max hop-uri
+    memset(hops_data, 0, sizeof(hops_data));
+    
+
+    //creez un ecran alternativ pentru a afisa tabelul, sterg tot, setez cursorul la inceput, ascund cursorul
+    send_Message(client_config->client_fd, "\033[?1049h\033[2J\033[H\033[?25l"); 
+
+    int seq = 0;
+    while(true){
+        bool reached = false;
+        char buffer[message_len];
+        memset(buffer, 0, sizeof(buffer));
+
+        //initializam antetul tabelului
+        strcat(buffer, " nr. |      Host IP      | Last(ms) | Sent | Avg(ms) |  Status  \n");
+        strcat(buffer, "-----|-------------------|----------|------|---------|----------\n");
+        send_Message(client_config->client_fd, buffer);
+        memset(buffer, 0, sizeof(buffer));
+
+        //pornim trimiterea mesajelor catre routere
+        for(int ttl = 1; ttl <= client_config->max_ttl && !reached; ttl++){
+            struct trace_hop_data *hop = &hops_data[ttl - 1];
+
+            //verificam daca vrem sa oprim
+            if(client_config->want_stop){
+                send_Message(client_config->client_fd, "Trace stoped!\n");
+                return 0;
+            }
+            //verificam daca vrem sa resetam
+            if(client_config->want_reset){
+                //sterg tot, setez cursorul la inceput, ascund cursorul
+                send_Message(client_config->client_fd, "\033[2J\033[H");
+                send_Message(client_config->client_fd, "Trace reseted!\n");
+
+                //reafisam antetul
+                strcat(buffer, " nr. |      Host IP      | Last(ms) | Sent | Avg(ms) |  Status  \n");
+                strcat(buffer, "-----|-------------------|----------|------|---------|----------\n");
+                send_Message(client_config->client_fd, buffer);
+                memset(buffer, 0, sizeof(buffer));
+
+                ttl = 1;    //pornim iarasi de la primul router
+                reached = false;
+                memset(hops_data, 0, sizeof(hops_data));
+                //este aceasta o sectiune critica
+                pthread_mutex_lock(&client_config->mutex);
+                client_config->want_reset = false;
+                pthread_mutex_unlock(&client_config->mutex);
+            }
+
+            for(int probe = 1; probe <= client_config->probes_per_ttl; probe++){
+                long rtt_ms = -1;   //round-trip time in milisecunde
+                char router_ip[64];
+                strncpy(router_ip, "*", sizeof(router_ip));
+                router_ip[sizeof(router_ip) - 1] = '\0';
+                seq++;
+                hop->send++;
+
+                if(send_Probe(sd, client_config->dest_ip, ttl, seq, client_config->client_fd) < 0){
+                    //send_Message(client_config->client_fd, "[traceroute] Error: send probe\n");
+                    printf("[server][trace] Error send_Probe\n");
+                    continue;
+                }
+
+                gettimeofday(&start, NULL); //timpul la care am trimis pchetul
+
+                int reply = recive_Reply(sd, client_config->client_fd, seq, router_ip, client_config->timeout_ms);
+
+                gettimeofday(&end, NULL); //timpul la care am primit raspunsul
+
+                if(reply == -2){
+                    //timeout
+                    printf("[server][trace]: Timeout waiting for reply\n");
+                }else if(reply < 0){
+                    //eroare
+                    printf("[server][trace] Error receiving reply\n");
+                }else{
+                    //am primit raspuns
+                    //memset(msg, 0, sizeof(msg));
+                    hop->received++;
+                
+                    //salvez ip-ul router-ului
+                    if(strcmp(router_ip, "*") != 0){
+                        strcpy(hop->router_ip, router_ip);
+                    }
+
+                    //calculez RTT
+                    rtt_ms = (end.tv_sec - start.tv_sec) * 1000 + (end.tv_usec / 1000 - start.tv_usec / 1000);
+
+                    //salvez statistica
+                    hop->last_rtt = rtt_ms;
+                    hop->sum_rtt += rtt_ms;
+
+                    if(reply == ICMP_ECHOREPLY){
+                        reached = true; //am ajuns la destinatie
+                        hop->reached = true;
+                    }
+                }
+
+                usleep(client_config->interval_ms * 1000); //interval intre probe 10 ms
+
+                //acutalizam datele pe ecran pentru fiecare pachet trimis
+
+                if(hop->send == 0){
+                    //nu am trimis probe la acest hop inca
+                    continue;
+                }
+
+                float avg_rtt = 0;   //daca nu am primit niciun raspuns este 0
+                if(hop->received > 0){
+                    avg_rtt = hop->sum_rtt / hop->received;
+                }
+
+                //determinam statutul si ii atribuim cate o culoare:
+                char *statut_str;
+                char *statut_color;
+                if(hop->received == 0){
+                    statut_str = "Lost";
+                    statut_color = CLR_ERR; //rosu
+
+                }else if(hop->received < hop->send){
+                    statut_str = "Unstable";
+                    statut_color = CLR_UNSTBL; //galben
+                }else {
+                    statut_str = "Good";
+                    statut_color = CLR_STBL; //verde
+                }
+                snprintf(buffer, sizeof(buffer), "\r %-3d | %-17s | %8d | %4d | %7.2f | %s%-8s %s \033[K", 
+                            ttl, hop->router_ip, hop->last_rtt, hop->send, avg_rtt, statut_color,statut_str, CLR_RESET);
+                send_Message(client_config->client_fd, buffer);
+                memset(buffer, 0, sizeof(buffer));
+            }//probe loop
+            send_Message(client_config->client_fd, "\n");
+        }//end ttl loop
+
+        //intoarcem cursorul sus
+        send_Message(client_config->client_fd, "\033[H");
+    }//end while
+
+    close(sd);
+    //send_Message(fd, "Traceroute completed.\n");
+    return 0;
+}
+
+pthread_mutex_t log_mutex = PTHREAD_MUTEX_INITIALIZER; //pentru sincronizarea scrierii in fisierul de log
+void log_packet_mismatch(int expected_id, int received_id, int seq, char* from_ip){
+    pthread_mutex_lock(&log_mutex);
+    
+    FILE *f = fopen("traceroute_debug.log", "a");
+    if (f) {
+        time_t now = time(NULL);
+        char *timestamp = ctime(&now);
+        timestamp[strlen(timestamp) - 1] = '\0'; // Scoatem \n-ul de la final
+
+        fprintf(f, "[%s] THREAD_FD(%d): Ignored packet from %s (Expected ID: %d, Got ID: %d, Seq: %d)\n",
+                timestamp, expected_id, from_ip, expected_id, received_id, seq);
+        fclose(f);
+    }
+    
+    pthread_mutex_unlock(&log_mutex);
 }

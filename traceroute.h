@@ -19,7 +19,6 @@
 #include <ctype.h>
 #include <pthread.h>
 
-#define PID_MASK 0xFFFF //masca pentru PID in pachetul ICMP
 #define PACKET_SIZE (sizeof(struct icmphdr) + sizeof(struct timeval))
 
 
@@ -63,11 +62,6 @@ struct trace_hop_data{
     bool reached;   //in cazul in care s-a ajuns la destinatie o vom seta ca true
 };
 
-//salvam datele pentru report
-struct trace_data{
-
-};
-
 struct trace_config default_trace_config(int client);
 
 //Checksum function for ICMP packets
@@ -76,13 +70,10 @@ unsigned short check_Sum(void *b, int len);
 
 //send probe probe with given TTL
 //construiesc pachetul ICMP ECHO REQUEST si il trimit
-int send_Probe(int sd, const char *dest_ip, int ttl, int seq);
+int send_Probe(int sd, const char *dest_ip, int ttl, int seq, int client_id);
 
 //ascult/filtrez raspunsurile ICMP primite
-int recive_Reply(int sd, int pid, int seq, char *router_ip, int timeout_ms);
-
-//functia de traceroute
-int traceroute(int fd, const char *dest_ip, int max_ttl, int timeout_ms, int interval_ms, int probes_per_ttl);
+int recive_Reply(int sd, int client_id, int seq, char *router_ip, int timeout_ms);
 
 //functia thread-ului de traceroute
 void* traceroute_thread(void *arg);
@@ -96,7 +87,9 @@ int traceroute_raport(struct trace_config* client_config);
 //trimite raportul clientului
 int send_raport(int fd, struct trace_hop_data* hops_data, int max_ttl);
 
-//crearea si afisarea tabelului cu datele traceului pe ecran
-int print_trace(int fd, struct trace_hop_data* hops_data, int max_ttl);
+//functia de traceroute continuu
+int traceroute(struct trace_config* client_config);
 
+//functie de logare a pachetelor care nu corespund clientului
+void log_packet_mismatch(int expected_id, int received_id, int seq, char* from_ip);
 #endif // TRACEROUTE_H

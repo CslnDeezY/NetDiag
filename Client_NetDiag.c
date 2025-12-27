@@ -20,6 +20,8 @@ volatile sig_atomic_t stop = 0;
 int recive_Message(int fd, char* buffer);
 int send_Message(int sd, char* buffer);
 void handler_sigint(int sig);
+void reset_terminal_view();
+int read_until_quit_ack(int sd, char *msg);
 
 int main (int argc, char *argv[])
 {
@@ -73,10 +75,12 @@ int main (int argc, char *argv[])
                 perror("[client]Eroare la send\n");
                 errno;
             }
-            recive_Message(sd, msg);
-            if(strcmp(msg, "Quit Accepted\n") == 0){
+            if(read_until_quit_ack(sd, msg) == 0){
                 printf("[client] Conexiunea la server s-a inchis.\n");
-            } else printf("[client] Raspuns neasteptat de la server: %s mai stau un pic\n", msg);
+                reset_terminal_view();
+            } else {
+                printf("[client] Raspuns neasteptat de la server: %s mai stau un pic\n", msg);
+            }
             break;
         }
 
@@ -128,10 +132,12 @@ int main (int argc, char *argv[])
                     perror("[client]Eroare la send\n");
                     errno;
                 }
-                recive_Message(sd, msg);
-                if(strcmp(msg, "Quit Accepted\n") == 0){
+                if(read_until_quit_ack(sd, msg) == 0){
                     printf("[client] Conexiunea la server s-a inchis.\n");
-                } else printf("[client] Raspuns neasteptat de la server: %s mai stau un pic\n", msg);
+                    //reset_terminal_view();
+                } else {
+                    printf("[client] Raspuns neasteptat de la server: %s mai stau un pic\n", msg);
+                }
                 break;
             }else if(send(sd, msg, strlen(msg), 0) <= 0){
                 perror("[client]Eroare la send\n");
@@ -182,4 +188,26 @@ int recive_Message(int fd, char* buffer){
 
 void handler_sigint(int sig){
     stop = 1;
+}
+
+void reset_terminal_view(){
+    //Revine la ecranul principal, arata cursorul, curata si pozitioneaza la inceput
+    printf("\033[?1049l\033[?25h\033[2J\033[H");
+    fflush(stdout);
+}
+
+//Citeste in bucla mesajele pana gaseste "Quit Accepted" sau conexiunea se inchide
+//Ignora output suplimentar de la traceroute Returneaza 0 cand a primit quit ack, altfel -1
+int read_until_quit_ack(int sd, char *msg){
+    while(true){
+        int rc = recive_Message(sd, msg);
+        if(rc <= 0){
+            //conexiune inchisa sau eroare
+            return -1;
+        }
+        if(strcmp(msg, "Quit Accepted\n") == 0){
+            return 0;
+        }
+        //alt mesaj: continua sa citeasca, poate fi output de traceroute
+    }
 }

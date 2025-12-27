@@ -640,9 +640,7 @@ void execute_quit(int fd, struct trace_config* client_config){
     pthread_mutex_lock(&client_config->mutex);
     client_config->want_stop = true;
     client_config->want_exit = true;
-    client_config->is_running = true;   //scoatem threadul din asteptare pentru a se curatoi si inchide corect
-
-    //trezil threadul
+    //nu mai fortam is_running; doar trezim threadul sa iasa elegant
     pthread_cond_signal(&client_config->cond);  //scoatem din starea de idle 
 
     pthread_mutex_unlock(&client_config->mutex);
@@ -677,10 +675,11 @@ void afisare_date_structura_config(int fd, struct trace_config* client_config){
     snprintf(buff, sizeof(buff), "%d\n", client_config->timeout_ms);      send_Message(fd, buff);
     snprintf(buff, sizeof(buff), "%d\n", client_config->cycle);           send_Message(fd, buff);
 }
-
+/*
 void trace_test(int fd, struct trace_config* client_config){
     if( traceroute(fd, client_config->dest_ip, client_config->max_ttl, client_config->timeout_ms, client_config->interval_ms, client_config->probes_per_ttl) < 0 ){
         send_Message(fd, "Traceroute failed due to an error.\n");
         return;
     }
 }
+    */
