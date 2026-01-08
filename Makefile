@@ -1,4 +1,4 @@
-CC = gcc
+GCC = gcc
 CFLAGS = -Wall -g
 
 CLIENT_SRC = Client_NetDiag.c
@@ -10,16 +10,12 @@ EXEC_SERVER = server
 all: $(EXEC_CLIENT) $(EXEC_SERVER)
 
 $(EXEC_CLIENT):
-	$(CC) $(CFLAGS) $(CLIENT_SRC) -o $(EXEC_CLIENT)
+	$(GCC) $(CFLAGS) $(CLIENT_SRC) -o $(EXEC_CLIENT)
 
 $(EXEC_SERVER):
-	$(CC) $(CFLAGS) $(SERVER_SRC) -o $(EXEC_SERVER)
+	$(GCC) $(CFLAGS) $(SERVER_SRC) -o $(EXEC_SERVER)
 
 clean:
 	rm -f $(EXEC_CLIENT) $(EXEC_SERVER)
 
 rebuild: clean all
-
-debug:
-	$(CC) -DDEBUG $(CFLAGS) $(CLIENT_SRC) -o $(EXEC_CLIENT)
-	$(CC) -DDEBUG $(CFLAGS) $(SERVER_SRC) -o $(EXEC_SERVER)

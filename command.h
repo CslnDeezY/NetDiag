@@ -34,7 +34,7 @@ char *conv_Addr(struct sockaddr_in address);
 
 //trimite un mesaj catre client:
 int send_Message( int fd, char* message );
-int recive_Message(int fd, char* buffer);
+//int recive_Message(int fd, char* buffer);
 
 //parsam comanda primita de la client si o stocam in structura Command
 struct Command parse_Command(const char* commandStr);
@@ -45,7 +45,7 @@ bool validate_maxttl    (const char *arg);
 bool validate_interval  (const char *arg);
 bool validate_timeout   (const char *arg);
 bool validate_probes    (const char *arg);
-bool validate_cycle     (const char  *arg);
+bool validate_cycle     (const char *arg);
 //preiau/executam comenzile:
 void command_Executor(int fd, struct Command cmd, struct trace_config* client_config);
 
@@ -63,8 +63,8 @@ void execute_report         (int fd, struct trace_config* client_config);
 void execute_quit           (int fd, struct trace_config* client_config);  
 void execute_help           (int fd);
 
-
-void afisare_date_structura_config(int fd, struct trace_config* client_config);
-void trace_test(int fd, struct trace_config* client_config);
+//functii pentru debug 
+//void afisare_date_structura_config(int fd, struct trace_config* client_config);
+//void trace_test(int fd, struct trace_config* client_config);
 
 #endif // COMMAND_H

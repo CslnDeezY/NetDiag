@@ -419,73 +419,73 @@ void command_Executor (int fd, struct Command cmd, struct trace_config* client_c
             printf("[server] Execute command SET DEST cu arg %s\n", cmd.arg);
             //send_Message(fd, "Comanda SET DEST inca nu este implementata\n");
             execute_set_dest(fd, cmd.arg, client_config);
-            printf("[server] Command SET DEST executed\n");
+            //printf("[server] Command SET DEST executed\n");
             break;
         case CMD_SET_MAXTTL:
             printf("[server] Execute command SET MAXTTL cu arg %s\n", cmd.arg);
             //send_Message(fd, "Commanda SET MAXTTL inca nu este implementata\n");
             execute_set_maxttl(fd, cmd.arg, client_config);
-            printf("[server] Command SET MAXTTL executed\n");
+            //printf("[server] Command SET MAXTTL executed\n");
             break;
         case CMD_SET_INTERVAL:
             printf("[server] Execute command SET INTERVAL cu arg %s\n", cmd.arg);
             //send_Message(fd, "Commanda SET INTERVAL inca nu este implementata\n");
             execute_set_interval(fd, cmd.arg, client_config);
-            printf("[server] Command SET INTERVAL executed\n");
+            //printf("[server] Command SET INTERVAL executed\n");
             break;
         case CMD_SET_TIMEOUT:
             printf("[server] Execute command SET TIMEOUT cu arg %s\n", cmd.arg);
             //send_Message(fd, "Commanda SET TIMEOUT inca nu este implementata\n");
             execute_set_timeout(fd, cmd.arg, client_config); 
-            printf("[server] Command SET TIMEOUT executed\n");
+            //printf("[server] Command SET TIMEOUT executed\n");
             break;
         case CMD_SET_PROBES:
             printf("[server] Execute command SET PROBES cu arg %s\n", cmd.arg);
             //send_Message(fd, "Commanda SET PROBES inca nu este implementata\n");
             execute_set_probes(fd, cmd.arg, client_config);
-            printf("[server] Command SET PROBES executed\n");
+            //printf("[server] Command SET PROBES executed\n");
             break;
         case CMD_SET_CYCLE:
             printf("[server] Execute command SET CYCLE cu arg %s\n", cmd.arg);
             //send_Message(fd, "Commanda SET CYCLE inca nu este implementata\n");
             execute_set_cycle(fd, cmd.arg, client_config);
-            printf("[server] Command SET CYCLE executed\n");
+            //printf("[server] Command SET CYCLE executed\n");
             break;
         case CMD_START:
             printf("[server] Execute command START\n");
             //send_Message(fd, "Commanda START inca nu este implementata\n");
             execute_start(fd, client_config);
-            printf("[server] Commanda START executata\n");
+            //printf("[server] Commanda START executata\n");
             break;
         case CMD_STOP:
             printf("[server] Execute command STOP\n");
             //send_Message(fd, "Commanda STOP inca nu este implementata\n");
             execute_stop(fd, client_config);
-            printf("[server] Commanda STOP executata\n");
+            //printf("[server] Commanda STOP executata\n");
             break;
         case CMD_RESET:
             printf("[server] Execute command RESET\n");
             //send_Message(fd, "Commanda RESET inca nu este implementata\n");
             execute_reset(fd, client_config);
-            printf("[server] Commanda RESET executata\n");
+            //printf("[server] Commanda RESET executata\n");
             break;
         case CMD_REPORT:
             printf("[server] Execute command REPORT\n");
             //send_Message(fd, "Commanda REPORT inca nu este implementata\n");
             execute_report(fd, client_config);
-            printf("[server] Commanda REPORT executata\n");
+            //printf("[server] Commanda REPORT executata\n");
             break;
         case CMD_HELP:
             printf("[server] Execute command HELP\n");
             //send_Message(fd, "Commanda HELP inca nu este implementata\n");
             execute_help(fd);
-            printf("[server] Commanda HELP executata\n");
+            //printf("[server] Commanda HELP executata\n");
             break;
         case CMD_QUIT:
             printf("[server] Execute command QUIT\n");
             //send_Message(fd, "Commanda QUIT inca nu este implementata\n");
             execute_quit(fd, client_config);
-            printf("[server] Commanda QUIT executata\n");
+            //printf("[server] Commanda QUIT executata\n");
             break;
         case CMD_INVALID:
             //aici nu ar trebui sa ajunga
@@ -500,6 +500,10 @@ void command_Executor (int fd, struct Command cmd, struct trace_config* client_c
 
 //functii de implementare a comenzilor
 void execute_set_dest(int fd, const char *arg, struct trace_config* client_config){
+    if(client_config->is_running == true){
+        send_Message(fd, "Cannot set destination while traceroute is running. Please stop it first.\n");
+        return;
+    }
     if(strcpy(client_config->dest_ip, arg)){
         char msg[128];
         snprintf(msg, sizeof(msg), "Destination IP set to %s\n", client_config->dest_ip);
@@ -509,30 +513,50 @@ void execute_set_dest(int fd, const char *arg, struct trace_config* client_confi
     }
 }
 void execute_set_maxttl(int fd, const char *arg, struct trace_config* client_config){
+    if(client_config->is_running == true){
+        send_Message(fd, "Cannot set max TTL while traceroute is running. Please stop it first.\n");
+        return;
+    }
     client_config->max_ttl = atoi(arg);
     char msg[128];
     snprintf(msg, sizeof(msg), "Max TTL set to %d\n", client_config->max_ttl);
     send_Message(fd, msg); 
 }
 void execute_set_interval(int fd, const char *arg, struct trace_config* client_config){
+    if(client_config->is_running == true){
+        send_Message(fd, "Cannot set interval while traceroute is running. Please stop it first.\n");
+        return;
+    }
     client_config->interval_ms = atoi(arg)*1000; ///convert to ms
     char msg[128];
     snprintf(msg, sizeof(msg), "Interval set to %d ms\n", client_config->interval_ms);
     send_Message(fd, msg);
 }
 void execute_set_timeout(int fd, const char *arg, struct trace_config* client_config){
+    if(client_config->is_running == true){
+        send_Message(fd, "Cannot set timeout while traceroute is running. Please stop it first.\n");
+        return;
+    }
     client_config->timeout_ms = atoi(arg);
     char msg[128];
     snprintf(msg, sizeof(msg), "Timeout set to %d ms\n", client_config->timeout_ms);
     send_Message(fd, msg);
 }
 void execute_set_probes(int fd, const char *arg, struct trace_config* client_config){
+    if(client_config->is_running == true){
+        send_Message(fd, "Cannot set probes per TTL while traceroute is running. Please stop it first.\n");
+        return;
+    }
     client_config->probes_per_ttl = atoi(arg);
     char msg[128];
     snprintf(msg, sizeof(msg), "Probes per TTL set to %d \n", client_config->probes_per_ttl);
     send_Message(fd, msg);
 }
 void execute_set_cycle(int fd, const char *arg, struct trace_config* client_config){
+    if(client_config->is_running == true){
+        send_Message(fd, "Cannot set cycle number while traceroute is running. Please stop it first.\n");
+        return;
+    }
     client_config->cycle = atoi(arg);
     char msg[128];
     snprintf(msg, sizeof(msg), "Cycle number set to %d\n", client_config->cycle);
@@ -582,7 +606,7 @@ void execute_stop(int fd, struct trace_config* client_config){
     pthread_mutex_unlock(&client_config->mutex);
 }
 void execute_reset(int fd, struct trace_config* client_config){
-       //aici e unpunct critic
+    //aici e unpunct critic
     pthread_mutex_lock(&client_config->mutex);
 
     if(!client_config->is_running){
@@ -628,7 +652,7 @@ void execute_help(int fd){
     char line[512] = "";
     //citesc si afisez fiecare linie
     while(fgets(line, sizeof(line), help_file) != NULL){
-        printf("[serve] D: Help execute:%s", line);
+        //printf("[serve] D: Help execute:%s", line);
         send_Message(fd, line);
         bzero(line, sizeof(line));
     }
@@ -662,8 +686,8 @@ void execute_quit(int fd, struct trace_config* client_config){
     close(fd);
 }
 
-//functii de testare
-
+//functii de testare:
+/*
 void afisare_date_structura_config(int fd, struct trace_config* client_config){
     //afisez datele structurii:
     send_Message(fd, client_config->dest_ip);
@@ -675,7 +699,7 @@ void afisare_date_structura_config(int fd, struct trace_config* client_config){
     snprintf(buff, sizeof(buff), "%d\n", client_config->timeout_ms);      send_Message(fd, buff);
     snprintf(buff, sizeof(buff), "%d\n", client_config->cycle);           send_Message(fd, buff);
 }
-/*
+
 void trace_test(int fd, struct trace_config* client_config){
     if( traceroute(fd, client_config->dest_ip, client_config->max_ttl, client_config->timeout_ms, client_config->interval_ms, client_config->probes_per_ttl) < 0 ){
         send_Message(fd, "Traceroute failed due to an error.\n");

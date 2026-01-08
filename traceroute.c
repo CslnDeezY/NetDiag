@@ -10,12 +10,12 @@ struct trace_config default_trace_config(int client){
     struct trace_config cfg;
     memset(&cfg, 0, sizeof(struct trace_config));
 
-    strncpy(cfg.dest_ip, "8.8.8.8", sizeof(cfg.dest_ip)); //localhost
+    strncpy(cfg.dest_ip, "127.0.0.1", sizeof(cfg.dest_ip)); //localhost
     cfg.dest_ip[sizeof(cfg.dest_ip)-1] = '\0';
     cfg.max_ttl = 30;
     cfg.timeout_ms = 500;      //0.5 secunde
     cfg.interval_ms = 1000;     //1 secunda
-    cfg.probes_per_ttl = 1;
+    cfg.probes_per_ttl = 3;
     cfg.cycle = 1;
 
     cfg.client_fd = client;
@@ -55,7 +55,6 @@ int send_Probe(int sd, const char *dest_ip, int ttl, int seq, int client_id){
     to_addr.sin_family = AF_INET;
     to_addr.sin_addr.s_addr = inet_addr(dest_ip);
 
-    //set ttl
     //setez ttl-ul in hederul IP al socket-ului
     //(fortez expirarea acestuia la un anumit hop)
     if(setsockopt(sd, IPPROTO_IP, IP_TTL, &ttl, sizeof(ttl)) < 0){
@@ -73,9 +72,9 @@ int send_Probe(int sd, const char *dest_ip, int ttl, int seq, int client_id){
     //populez campurile 
     icmp->type = ICMP_ECHO;
     icmp->code = 0;
-    //folosim client_id (fd-ul socketului) in loc de getpid()
+    //folosim client_id (fd-ul socketului)
     icmp->un.echo.id = htons(client_id & 0xFFFF); //identificator unic pentru proces
-    icmp->un.echo.sequence = htons(seq);            //nr pachetului in secventa
+    icmp->un.echo.sequence = htons(seq);          //nr pachetului in secventa
 
     //calculez checksum-ul
     int packet_len = sizeof(struct icmphdr);
@@ -83,13 +82,13 @@ int send_Probe(int sd, const char *dest_ip, int ttl, int seq, int client_id){
     icmp->checksum = 0;
     icmp->checksum = check_Sum(packet, packet_len);
 
-    //in sfarsit trimit pachetul trimit pachetul  (sper ca merge)
+    //in sfarsit trimit pachetul(sper ca merge)
     int sent = sendto(sd, packet, packet_len, 0, (struct sockaddr*)&to_addr, sizeof(to_addr));
     if(sent < 0){
         perror("[server][trace]: sendto() error\n");
         return -1;
     }
-    //printf("D: [server][trace]: Sent ICMP probe to %s with TTL=%d, seq=%d\n", dest_ip, ttl, seq);
+    //printf("Debug: [server][trace]: Sent ICMP probe to %s with TTL=%d, seq=%d\n", dest_ip, ttl, seq);
     return sent;
 }
 
@@ -120,8 +119,8 @@ int recive_Reply(int sd, int client_id, int seq, char *router_ip, int timeout_ms
             perror("[server][trace]: Error: select()\n");
             return -1;
         } else if(rt == 0){
-            printf("D: [server][trace]: select() timeout (seq=%d)\n", seq);
-            return -2; // timeout, no data ready (avoid clashing with ICMP_ECHOREPLY==0)
+            //printf("Debug: [server][trace]: select() timeout (seq=%d)\n", seq);
+            return -2; //timeout, no data ready (avoid clashing with ICMP_ECHOREPLY==0)
             
         }
 
@@ -140,7 +139,7 @@ int recive_Reply(int sd, int client_id, int seq, char *router_ip, int timeout_ms
         struct iphdr *ip_hdr = (struct iphdr*)buff;
         int ip_header_len = ip_hdr->ihl * 4;
 
-        if(bytes < ip_header_len + (int)sizeof(struct icmphdr)) 
+        if(bytes < ip_header_len + (int)sizeof(struct icmphdr)) //pachet prea mic adica invalid
             continue;
 
         struct icmphdr *icmp_hdr = (struct icmphdr*)(buff + ip_header_len);
@@ -151,37 +150,38 @@ int recive_Reply(int sd, int client_id, int seq, char *router_ip, int timeout_ms
         //printf("Debug: [server][trace]: Received ICMP type=%d, code=%d from %s\n", icmp_hdr->type, icmp_hdr->code, inet_ntoa(from_addr.sin_addr));
 
         //procesare:
-        if (icmp_hdr->type == ICMP_TIME_EXCEEDED || icmp_hdr->type == ICMP_DEST_UNREACH) {
-            if (bytes < ip_header_len + (int)sizeof(struct icmphdr) + (int)sizeof(struct iphdr) + 8) 
+        if(icmp_hdr->type == ICMP_TIME_EXCEEDED || icmp_hdr->type == ICMP_DEST_UNREACH){
+            if(bytes < ip_header_len + (int)sizeof(struct icmphdr) + (int)sizeof(struct iphdr) + 8) 
                 continue;
 
-            struct iphdr *org_ip_hdr = (struct iphdr*)(buff + ip_header_len + sizeof(struct icmphdr));
-            int org_ip_hdr_len = org_ip_hdr->ihl * 4;
+            struct iphdr *org_ip_hdr = (struct iphdr*)(buff + ip_header_len + sizeof(struct icmphdr));//headerul IP original din pachetul ICMP
+            int org_ip_hdr_len = org_ip_hdr->ihl * 4;//lungimea headerului IP original
 
             struct icmphdr *org_icmp_hdr = (struct icmphdr*)(buff + ip_header_len + sizeof(struct icmphdr) + org_ip_hdr_len);
 
             received_id  = ntohs(org_icmp_hdr->un.echo.id);
             received_seq = ntohs(org_icmp_hdr->un.echo.sequence);
-        } else if (icmp_hdr->type == ICMP_ECHOREPLY) {
-            if (icmp_hdr->code != 0)
+        }else if(icmp_hdr->type == ICMP_ECHOREPLY){
+            if(icmp_hdr->code != 0)//cod diferit de 0 inseamna ceva ciudat
                 continue;
             received_id  = ntohs(icmp_hdr->un.echo.id);
             received_seq = ntohs(icmp_hdr->un.echo.sequence);
-        } else {
+        }else{
+            //For DEBUG:
             //pachetul este pentru alt client
-            // logam faptul ca am "interceptat" pachetul altcuiva
-            log_packet_mismatch(client_id, received_id, received_seq, inet_ntoa(from_addr.sin_addr));
-            continue; // ignora alte tipuri
+            //logam faptul ca am interceptat pachetul altcuiva
+            //log_packet_mismatch(client_id, received_id, received_seq, inet_ntoa(from_addr.sin_addr));
+            continue; //ignora alte tipuri
         }
 
         //verifica daca pachetul e al nostru
-        if (received_id == (client_id & 0xFFFF) && received_seq == seq) {
+        if(received_id == (client_id & 0xFFFF) && received_seq == seq){
             const char *ip_str = inet_ntoa(from_addr.sin_addr);
             strncpy(router_ip, ip_str, INET_ADDRSTRLEN - 1);
             router_ip[INET_ADDRSTRLEN - 1] = '\0';
             //printf("Debug: [server][trace]: MATCH! Reply de la %s, type=%d\n", router_ip, icmp_hdr->type);
             return icmp_hdr->type;
-        } else {
+        }else{
             //printf("Debug: [server][trace]: Mismatch - expected seq=%d, got seq=%d\n", seq, received_seq);
             continue;
         }
@@ -208,7 +208,6 @@ void* traceroute_thread(void *arg){
             printf("[server][trace_thread]: Exiting traceroute thread\n");
             break;
         }
-
         pthread_mutex_unlock(&client_config->mutex);
 
         //executarea propriuzisa a trace-ului (aici e cel mai mult)
@@ -334,7 +333,7 @@ int traceroute_raport(struct trace_config* client_config){
                     }
                 }
 
-                usleep(client_config->interval_ms * 1000); //interval intre probe 10 ms
+                usleep(client_config->interval_ms * 1000); //interval intre probe
             }//probe loop
         }//ttl loop
     }//cycle loop
@@ -441,7 +440,7 @@ int traceroute(struct trace_config* client_config){
             if(client_config->want_reset){
                 //sterg tot, setez cursorul la inceput, ascund cursorul
                 send_Message(client_config->client_fd, "\033[2J\033[H");
-                send_Message(client_config->client_fd, "Trace reseted!\n");
+                //send_Message(client_config->client_fd, "Trace reseted!\n");
 
                 //reafisam antetul
                 strcat(buffer, " nr. |      Host IP      | Last(ms) | Sent | Avg(ms) |  Status  \n");

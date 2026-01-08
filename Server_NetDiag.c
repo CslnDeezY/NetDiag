@@ -3,25 +3,50 @@
 extern int errno;
 #define PORT 3686
 
+int nfds;			            //nr maxim
+int sd;                         //socket descriptor server
+fd_set actfds;                  //mult fdesc activi
+
 //tablou de configurari pentru fiecare client
 struct trace_config client_configs[FD_SETSIZE];
 
+//rescrierea signalului ctrl+c pt inchiderea corecta a conexiunii
+void handle_sigint(int sig){ 
+    printf("\n[server] Semnalul %d (SIGINT) interceptat. Incepem inchiderea...\n", sig); 
 
+    //parcurgem toti descriptorii posibili pana la maximul curent (nfds)
+    for(int fd = 0; fd <= nfds; fd++){
+        if(FD_ISSET(fd, &actfds)){
+            //Daca este socketul serverului
+            if(fd == sd){
+                printf("[server] Inchid socket-ul de listening (%d).\n", fd);
+            } 
+            else{
+                printf("[server] Inchid conexiunea cu clientul %d.\n", fd);
+                send_Message(fd, "Server is shutting down."); 
+            }
+            close(fd);
+            FD_CLR(fd, &actfds);
+        }
+    }
+    printf("[server] Toate conexiunile inchise. Iesire.\n");
+    exit(0); 
+}
 
 int main(int argc, char* argv[]){
 
-    FILE *f = fopen("traceroute_debug.log", "w");
-    if(f) fclose(f);
+    signal(SIGINT, handle_sigint);
+
+    //FILE *f = fopen("traceroute_debug.log", "w");
+    //if(f) fclose(f);
 
     struct sockaddr_in server;	    //struct server - client
     struct sockaddr_in from;
     fd_set readfds;                 //multimea descriptorilor de citire
-    fd_set actfds;                  //mult fdesc activi
-    struct timeval tv;		        // structura de timp pentru select()
-    int sd, client;                 //descriptori sock lucru
+    struct timeval tv;		        //structura de timp pentru select()
+    int client;                     //descriptori sock lucru
     int optval=1;                   //pt setsockopt
 
-    int nfds;			            //nr maxim
     int len;			            //lungimea structurii sockaddr_in
 
     //creez socket
@@ -38,8 +63,8 @@ int main(int argc, char* argv[]){
 
     //prepar structurile:
     bzero (&server, sizeof (server));
-    server.sin_addr.s_addr = htonl (INADDR_ANY);
-    server.sin_port = htons (PORT);
+    server.sin_addr.s_addr = htonl (INADDR_ANY);//acceptam orice adresa //convert la format retea
+    server.sin_port = htons (PORT);//utilizam un port utilizator
     server.sin_family = AF_INET;
 
     //atasez:
@@ -47,8 +72,7 @@ int main(int argc, char* argv[]){
         perror("[server] Error: bind()\n");
         return errno;
     }
-    if (listen (sd, 16) == -1)
-    {
+    if(listen (sd, 16) == -1){
         perror ("[server] Error: listen()\n");
         return errno;
     }
@@ -72,6 +96,9 @@ int main(int argc, char* argv[]){
         bcopy( (char*) &actfds, (char*) &readfds, sizeof(readfds));
 
         if(select(nfds+1, &readfds, NULL, NULL, &tv) < 0){
+            if(errno == EINTR){ //intrerupt de un semnal
+                continue; 
+            }
             perror("[server] Error: select()\n");
             return errno;
         }
@@ -97,7 +124,7 @@ int main(int argc, char* argv[]){
             //adaug la lista de socketi activi:
             FD_SET(client, &actfds);
 
-            printf("[server] The client with descriptor %d, from address %s, has connected\n",client, conv_Addr (from));
+            printf("[server] The client with descriptor %d, from address %s, has connected\n",client, conv_Addr(from));
             fflush (stdout);
         }
 
@@ -116,7 +143,7 @@ int main(int argc, char* argv[]){
                     return errno;
                 }else if(bytesRead == 0){
                     //conexiunea s-a inchis
-                    printf("[server] The client with descriptor %d disconnected from address %s\n",fd, conv_Addr (from));
+                    printf("[server] The client with descriptor %d disconnected from address %s\n",fd, conv_Addr(from));
                     fflush (stdout);
                     close(fd);
                     FD_CLR(fd, &actfds);
@@ -132,7 +159,6 @@ int main(int argc, char* argv[]){
                         bool isQuit = (cmd.type == CMD_QUIT);
 
                         command_Executor(fd, cmd, &client_configs[fd]);
-
                         if(isQuit){
                             printf("Debug: [serer] stergem descriptorul %d din multimea de descriptori activi\n", fd);
                             FD_CLR(fd, &actfds);
